@@ -1,0 +1,14 @@
+# dbt/profiles.yml.example
+# Copier vers dbt/profiles.yml et remplacer les valeurs
+# ⚠ dbt/profiles.yml est dans .gitignore — ne jamais le committer
+
+datatalent:
+  target: dev
+  outputs:
+    dev:
+      type: bigquery
+      method: oauth
+      project: <YOUR_GCP_PROJECT_ID>
+      dataset: staging
+      threads: 4
+      location: europe-west1

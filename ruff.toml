@@ -1,0 +1,14 @@
+# Ruff — convention d'équipe DataTalent
+target-version = "py312"
+line-length = 88
+
+[lint]
+select = [
+    "E",    # pycodestyle errors
+    "F",    # pyflakes
+    "I",    # isort (tri des imports)
+    "UP",   # pyupgrade (syntaxe moderne Python 3.12)
+]
+
+[format]
+quote-style = "double"

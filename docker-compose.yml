@@ -1,0 +1,10 @@
+# DataTalent — Docker Compose (dev local)
+# Usage : docker compose up ingestion
+services:
+  ingestion:
+    build:
+      context: ./ingestion
+      dockerfile: Dockerfile
+    env_file: .env
+    volumes:
+      - ./ingestion:/app
