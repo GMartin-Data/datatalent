@@ -19,7 +19,7 @@ uv tool install pre-commit
 ## Installation
 ```bash
 # 1. Clone
-git clone git@github.com:<org>/datatalent.git && cd datatalent
+git clone git@github.com:GMartin-Data/datatalent.git && cd datatalent
 
 # 2. Dépendances Python (uv installe Python 3.12 automatiquement si absent)
 cd ingestion && uv sync && cd ..

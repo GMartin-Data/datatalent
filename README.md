@@ -21,7 +21,7 @@ Pipeline data end-to-end GCP : "Où recrute-t-on des Data Engineers en France, d
 
 Voir [docs/setup.md](docs/setup.md) pour l'installation complète.
 ```bash
-git clone git@github.com:<org>/datatalent.git && cd datatalent
+git clone git@github.com:GMartin-Data/datatalent.git && cd datatalent
 cd ingestion && uv sync && cd ..
 pre-commit install && pre-commit install --hook-type commit-msg
 ```
