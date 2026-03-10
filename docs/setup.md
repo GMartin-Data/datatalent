@@ -26,7 +26,6 @@ cd ingestion && uv sync && cd ..
 
 # 3. Hooks pre-commit (les deux commandes sont nécessaires)
 pre-commit install
-pre-commit install --hook-type commit-msg
 
 # 4. Fichiers locaux (ne seront jamais committés)
 cp dbt/profiles.yml.example dbt/profiles.yml

@@ -23,7 +23,7 @@ Voir [docs/setup.md](docs/setup.md) pour l'installation complète.
 ```bash
 git clone git@github.com:GMartin-Data/datatalent.git && cd datatalent
 cd ingestion && uv sync && cd ..
-pre-commit install && pre-commit install --hook-type commit-msg
+pre-commit install
 ```
 
 ## Structure du repo
