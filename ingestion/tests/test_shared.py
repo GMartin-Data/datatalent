@@ -1,9 +1,12 @@
-"""Tests for ingestion.shared.logging."""
+"""Tests for ingestion.shared (logging, gcs, bigquery)."""
 
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
 import structlog.testing
+from google.cloud import bigquery
+from shared.bigquery import _infer_source_format, load_gcs_to_bq
 from shared.gcs import upload_to_gcs
 from shared.logging import get_logger
 
@@ -74,7 +77,69 @@ class TestUploadToGcs:
 
     def test_raises_on_missing_file(self) -> None:
         """upload_to_gcs raises FileNotFoundError for nonexistent files."""
-        import pytest
-
         with pytest.raises(FileNotFoundError):
             upload_to_gcs("/nonexistent/file.json", "sirene")
+
+
+class TestInferSourceFormat:
+    """Tests for _infer_source_format()."""
+
+    def test_json_format(self) -> None:
+        fmt = _infer_source_format("gs://bucket/prefix/2026-03-11/data.json")
+        assert fmt == bigquery.SourceFormat.NEWLINE_DELIMITED_JSON
+
+    def test_jsonl_format(self) -> None:
+        fmt = _infer_source_format("gs://bucket/prefix/2026-03-11/data.jsonl")
+        assert fmt == bigquery.SourceFormat.NEWLINE_DELIMITED_JSON
+
+    def test_parquet_format(self) -> None:
+        fmt = _infer_source_format("gs://bucket/prefix/2026-03-11/stock.parquet")
+        assert fmt == bigquery.SourceFormat.PARQUET
+
+    def test_unsupported_format_raises(self) -> None:
+        with pytest.raises(ValueError, match="Unsupported file format"):
+            _infer_source_format("gs://bucket/prefix/data.csv")
+
+
+class TestLoadGcsToBq:
+    """Tests for load_gcs_to_bq()."""
+
+    @patch("shared.bigquery.bigquery.Client")
+    def test_calls_load_with_correct_config(self, mock_client_cls: MagicMock) -> None:
+        """load_gcs_to_bq triggers a load job with WRITE_TRUNCATE and autodetect."""
+        mock_client = mock_client_cls.return_value
+        mock_job = mock_client.load_table_from_uri.return_value
+
+        load_gcs_to_bq(
+            "gs://datatalent-raw/geo/2026-03-11/regions.json", "raw", "geo_regions"
+        )
+
+        # Verify load_table_from_uri was called with the right URI and table.
+        call_args = mock_client.load_table_from_uri.call_args
+        assert call_args[0][0] == "gs://datatalent-raw/geo/2026-03-11/regions.json"
+        assert call_args[0][1] == "raw.geo_regions"
+
+        # Verify the job config.
+        job_config = call_args[1]["job_config"]
+        assert job_config.autodetect is True
+        assert job_config.write_disposition == bigquery.WriteDisposition.WRITE_TRUNCATE
+
+        # Verify job.result() was called (blocking wait).
+        mock_job.result.assert_called_once()
+
+    @patch("shared.bigquery.bigquery.Client")
+    def test_stamps_ingestion_date(self, mock_client_cls: MagicMock) -> None:
+        """load_gcs_to_bq runs ALTER + UPDATE to add _ingestion_date."""
+        mock_client = mock_client_cls.return_value
+
+        load_gcs_to_bq(
+            "gs://datatalent-raw/sirene/2026-03-11/stock.parquet", "raw", "sirene"
+        )
+
+        # client.query() is called twice: ALTER then UPDATE.
+        queries = [call[0][0] for call in mock_client.query.call_args_list]
+        assert len(queries) == 2
+        assert "ALTER TABLE" in queries[0]
+        assert "_ingestion_date" in queries[0]
+        assert "UPDATE" in queries[1]
+        assert "CURRENT_DATE()" in queries[1]
