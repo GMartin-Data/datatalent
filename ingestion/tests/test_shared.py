@@ -1,6 +1,10 @@
 """Tests for ingestion.shared.logging."""
 
+from pathlib import Path
+from unittest.mock import MagicMock, patch
+
 import structlog.testing
+from shared.gcs import upload_to_gcs
 from shared.logging import get_logger
 
 
@@ -38,3 +42,39 @@ class TestGetLogger:
         assert len(captured) == 2
         assert captured[0]["module"] == "module_a"
         assert captured[1]["module"] == "module_b"
+
+
+class TestUploadToGcs:
+    """Tests for upload_to_gcs()."""
+
+    @patch("shared.gcs.storage.Client")
+    def test_returns_gcs_uri(self, mock_client_cls: MagicMock, tmp_path: Path) -> None:
+        """upload_to_gcs returns a well-formed gs:// URI."""
+        test_file = tmp_path / "offres.json"
+        test_file.write_text('{"data": true}')
+
+        uri = upload_to_gcs(str(test_file), "france_travail")
+
+        assert uri.startswith("gs://datatalent-raw/france_travail/")
+        assert uri.endswith("/offres.json")
+
+    @patch("shared.gcs.storage.Client")
+    def test_calls_upload_from_filename(
+        self, mock_client_cls: MagicMock, tmp_path: Path
+    ) -> None:
+        """upload_to_gcs calls blob.upload_from_filename with the local path."""
+        test_file = tmp_path / "data.json"
+        test_file.write_text("{}")
+
+        mock_blob = mock_client_cls.return_value.bucket.return_value.blob.return_value
+
+        upload_to_gcs(str(test_file), "geo")
+
+        mock_blob.upload_from_filename.assert_called_once_with(str(test_file))
+
+    def test_raises_on_missing_file(self) -> None:
+        """upload_to_gcs raises FileNotFoundError for nonexistent files."""
+        import pytest
+
+        with pytest.raises(FileNotFoundError):
+            upload_to_gcs("/nonexistent/file.json", "sirene")
