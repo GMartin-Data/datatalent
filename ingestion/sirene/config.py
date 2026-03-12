@@ -2,7 +2,9 @@ from pathlib import Path
 
 # Dataset officiel Base Sirene sur data.gouv
 DATA_GOUV_DATASET_ID = "5b7ffc618b4c4169d30727e0"
-DATA_GOUV_API_DATASET_URL = f"https://www.data.gouv.fr/api/1/datasets/{DATA_GOUV_DATASET_ID}/"
+DATA_GOUV_API_DATASET_URL = (
+    f"https://www.data.gouv.fr/api/1/datasets/{DATA_GOUV_DATASET_ID}/"
+)
 
 BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "data"

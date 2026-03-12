@@ -2,13 +2,12 @@ from __future__ import annotations
 
 import sys
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 import pyarrow.parquet as pq
 import requests
-
 from sirene.config import (
     CHUNK_SIZE,
     DATA_GOUV_API_DATASET_URL,
@@ -52,11 +51,13 @@ def parse_iso_datetime(value: str) -> datetime:
     cleaned = value.replace("Z", "+00:00")
     dt = datetime.fromisoformat(cleaned)
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    return dt.astimezone(timezone.utc)
+        dt = dt.replace(tzinfo=UTC)
+    return dt.astimezone(UTC)
 
 
-def find_resource_by_id(dataset_metadata: dict[str, Any], resource_id: str) -> dict[str, Any]:
+def find_resource_by_id(
+    dataset_metadata: dict[str, Any], resource_id: str
+) -> dict[str, Any]:
     for resource in dataset_metadata.get("resources", []):
         if resource.get("id") == resource_id:
             return resource
@@ -77,10 +78,14 @@ def build_resource_info(
     download_url = raw.get("latest") or raw.get("url")
 
     if not resource_last_modified:
-        raise ValueError(f"La ressource {logical_name} ne contient pas de champ 'last_modified'.")
+        raise ValueError(
+            f"La ressource {logical_name} ne contient pas de champ 'last_modified'."
+        )
 
     if not download_url:
-        raise ValueError(f"La ressource {logical_name} ne contient ni 'latest' ni 'url'.")
+        raise ValueError(
+            f"La ressource {logical_name} ne contient ni 'latest' ni 'url'."
+        )
 
     return ResourceInfo(
         logical_name=logical_name,
@@ -102,8 +107,10 @@ def validate_resource_format(resource: ResourceInfo, expected_format: str) -> No
         )
 
 
-def validate_resource_freshness(resource: ResourceInfo, max_age_days: int = MAX_RESOURCE_AGE_DAYS) -> None:
-    now_utc = datetime.now(timezone.utc)
+def validate_resource_freshness(
+    resource: ResourceInfo, max_age_days: int = MAX_RESOURCE_AGE_DAYS
+) -> None:
+    now_utc = datetime.now(UTC)
     age_days = (now_utc - resource.last_modified).days
 
     if age_days > max_age_days:
@@ -125,13 +132,17 @@ def build_prepared_filename(resource: ResourceInfo) -> str:
     return f"{resource.filename_prefix}_{build_month_tag(resource)}_light.parquet"
 
 
-def cleanup_old_versions(directory: Path, filename_prefix: str, keep_filename: str) -> None:
+def cleanup_old_versions(
+    directory: Path, filename_prefix: str, keep_filename: str
+) -> None:
     for file_path in directory.glob(f"{filename_prefix}_*.parquet"):
         if file_path.name != keep_filename and file_path.is_file():
             file_path.unlink()
 
 
-def get_content_length(headers: requests.structures.CaseInsensitiveDict[str]) -> int | None:
+def get_content_length(
+    headers: requests.structures.CaseInsensitiveDict[str],
+) -> int | None:
     raw_value = headers.get("Content-Length")
     if raw_value is None:
         return None
@@ -144,7 +155,9 @@ def get_content_length(headers: requests.structures.CaseInsensitiveDict[str]) ->
 def download_file(resource: ResourceInfo, destination: Path) -> None:
     temp_path = destination.with_suffix(destination.suffix + ".part")
 
-    with requests.get(resource.download_url, stream=True, timeout=HTTP_TIMEOUT_SECONDS) as response:
+    with requests.get(
+        resource.download_url, stream=True, timeout=HTTP_TIMEOUT_SECONDS
+    ) as response:
         response.raise_for_status()
 
         final_url = response.url.lower()
@@ -179,7 +192,9 @@ def download_file(resource: ResourceInfo, destination: Path) -> None:
     temp_path.replace(destination)
 
 
-def select_existing_columns(available_columns: list[str], required_columns: list[str]) -> list[str]:
+def select_existing_columns(
+    available_columns: list[str], required_columns: list[str]
+) -> list[str]:
     available_set = set(available_columns)
     return [col for col in required_columns if col in available_set]
 
@@ -281,8 +296,8 @@ def process_one_resource(
         log(
             "[ATTENTION] Le parquet allégé reste plus lourd ou équivalent au brut. "
             "Cela peut venir de la stratégie de compression du fichier source. "
-            "Le sous-ensemble de colonnes a bien été appliqué, mais la réécriture Parquet "
-            "n'est pas forcément plus compacte que celle du fournisseur."
+            "Le sous-ensemble de colonnes a bien été appliqué, mais la réécriture "
+            "Parquet n'est pas forcément plus compacte que celle du fournisseur."
         )
 
     return raw_path, prepared_path
@@ -295,7 +310,9 @@ def run() -> list[tuple[Path, Path]]:
 
     outputs: list[tuple[Path, Path]] = []
     for logical_name, resource_cfg in SIRENE_RESOURCES.items():
-        outputs.append(process_one_resource(logical_name, resource_cfg, dataset_metadata))
+        outputs.append(
+            process_one_resource(logical_name, resource_cfg, dataset_metadata)
+        )
 
     log("\nExtraction et allègement terminés avec succès.")
     return outputs

@@ -1,10 +1,9 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
-
 from sirene.ingest import (
     ResourceInfo,
     build_prepared_filename,
@@ -26,7 +25,7 @@ def make_resource(
     filename_prefix: str = "StockUniteLegale",
 ) -> ResourceInfo:
     if last_modified is None:
-        last_modified = datetime.now(timezone.utc)
+        last_modified = datetime.now(UTC)
 
     return ResourceInfo(
         logical_name=logical_name,
@@ -41,7 +40,7 @@ def make_resource(
 
 
 def test_parse_iso_datetime_z_suffix():
-    now_utc = datetime.now(timezone.utc).replace(microsecond=0)
+    now_utc = datetime.now(UTC).replace(microsecond=0)
     iso_value = now_utc.isoformat().replace("+00:00", "Z")
 
     dt = parse_iso_datetime(iso_value)
@@ -51,17 +50,19 @@ def test_parse_iso_datetime_z_suffix():
 
 
 def test_build_raw_filename():
-    dt = datetime(2026, 3, 5, 10, 30, tzinfo=timezone.utc)
+    dt = datetime(2026, 3, 5, 10, 30, tzinfo=UTC)
     resource = make_resource(last_modified=dt, filename_prefix="StockUniteLegale")
 
     assert build_raw_filename(resource) == "StockUniteLegale_2026-03.parquet"
 
 
 def test_build_prepared_filename():
-    dt = datetime(2026, 3, 5, 10, 30, tzinfo=timezone.utc)
+    dt = datetime(2026, 3, 5, 10, 30, tzinfo=UTC)
     resource = make_resource(last_modified=dt, filename_prefix="StockEtablissement")
 
-    assert build_prepared_filename(resource) == "StockEtablissement_2026-03_light.parquet"
+    assert (
+        build_prepared_filename(resource) == "StockEtablissement_2026-03_light.parquet"
+    )
 
 
 def test_select_existing_columns_preserves_required_order():
@@ -86,14 +87,14 @@ def test_validate_resource_format_raises_for_wrong_format():
 
 
 def test_validate_resource_freshness_ok():
-    recent_dt = datetime.now(timezone.utc) - timedelta(days=5)
+    recent_dt = datetime.now(UTC) - timedelta(days=5)
     resource = make_resource(last_modified=recent_dt)
 
     validate_resource_freshness(resource, max_age_days=45)
 
 
 def test_validate_resource_freshness_raises_for_old_resource():
-    old_dt = datetime.now(timezone.utc) - timedelta(days=90)
+    old_dt = datetime.now(UTC) - timedelta(days=90)
     resource = make_resource(last_modified=old_dt)
 
     with pytest.raises(ValueError, match="Ressource trop ancienne"):
@@ -128,7 +129,9 @@ def test_transform_parquet_keep_columns_writes_only_selected_columns(tmp_path: P
     assert result.num_rows == 2
 
 
-def test_transform_parquet_keep_columns_raises_if_no_requested_column_exists(tmp_path: Path):
+def test_transform_parquet_keep_columns_raises_if_no_requested_column_exists(
+    tmp_path: Path,
+):
     source_path = tmp_path / "source.parquet"
     destination_path = tmp_path / "prepared.parquet"
 
@@ -165,7 +168,9 @@ def test_run_calls_process_for_each_resource(monkeypatch):
         )
 
     monkeypatch.setattr("sirene.ingest.ensure_directories", fake_ensure_directories)
-    monkeypatch.setattr("sirene.ingest.fetch_dataset_metadata", fake_fetch_dataset_metadata)
+    monkeypatch.setattr(
+        "sirene.ingest.fetch_dataset_metadata", fake_fetch_dataset_metadata
+    )
     monkeypatch.setattr("sirene.ingest.process_one_resource", fake_process_one_resource)
 
     outputs = run()
