@@ -18,7 +18,7 @@ def fetch_geo_data(resource):
     return response.json()
 
 
-def main():
+def run():
     for resource in RESOURCES:
         try:
             data = fetch_geo_data(resource)
@@ -48,4 +48,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    run()
