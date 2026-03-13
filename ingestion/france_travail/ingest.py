@@ -1,10 +1,26 @@
-"""France Travail ingestion — stub for Bloc 1 development."""
+# ingestion/france_travail/ingest.py
+from pathlib import Path
+import json
+from france_travail.config import RAW_DATA_DIR
+from france_travail.offres import fetch_all_offres
 
-from shared.logging import get_logger
+codes_rome = ["M1805"]
+departements = ["75"]
 
-logger = get_logger(__name__)
+def run():
+    output_dir = Path(RAW_DATA_DIR)
+    output_dir.mkdir(parents=True, exist_ok=True)
 
+    for code in codes_rome:
+        for dept in departements:
+            print(f"Ingestion {code} — département {dept}")
+            offres = fetch_all_offres(code, dept)
 
-def run() -> None:
-    """Ingest France Travail job offers. Not yet implemented."""
-    logger.warning("france_travail_skipped", reason="not yet implemented")
+            file_path = output_dir / f"offres_{code}_{dept}.json"
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(offres, f, ensure_ascii=False, indent=2)
+
+            print(f"Stocké : {file_path} ({len(offres)} offres)")
+
+if __name__ == "__main__":
+    run()
