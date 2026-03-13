@@ -1,11 +1,10 @@
 # ingestion/france_travail/ingest.py
 from pathlib import Path
 import json
-from france_travail.config import RAW_DATA_DIR
-from france_travail.offres import fetch_all_offres
+from config import RAW_DATA_DIR
+from offres import fetch_all_offres
+from config import codes_rome, departements
 
-codes_rome = ["M1805"]
-departements = ["75"]
 
 def run():
     output_dir = Path(RAW_DATA_DIR)
