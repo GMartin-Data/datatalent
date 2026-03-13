@@ -1,13 +1,7 @@
 import time
-import requests
-from ingestion.france_travail.auth import get_token, invalidate_token
-
-API_URL = "https://api.francetravail.io/partenaire/offresdemploi/v2/offres/search"
-
-BATCH_SIZE = 150
-MAX_OFFRES = 3000 
-MAX_RETRIES = 5
-BACKOFF_BASE = 2
+import httpx
+from auth import get_token, invalidate_token
+from config import API_URL, BATCH_SIZE, MAX_OFFRES, MAX_RETRIES, BACKOFF_BASE
 
 
 def _fetch_batch(code_rome: str, departement: str, start: int, end: int) -> tuple[list, int]:
@@ -21,7 +15,7 @@ def _fetch_batch(code_rome: str, departement: str, start: int, end: int) -> tupl
                 "range": f"{start}-{end}"
             }
 
-            response = requests.get(API_URL, headers=headers, params=params)
+            response = httpx.get(API_URL, headers=headers, params=params)
 
             if response.status_code == 429:
                 wait = BACKOFF_BASE ** attempt
@@ -41,7 +35,7 @@ def _fetch_batch(code_rome: str, departement: str, start: int, end: int) -> tupl
             offres = data.get("resultats", [])
             return offres, total
 
-        except requests.HTTPError as e:
+        except httpx.HTTPError as e:
             raise
 
     raise RuntimeError(f"Échec après {MAX_RETRIES} tentatives ({code_rome}, dept {departement})")

@@ -126,5 +126,5 @@ def mock_invalidate():
 
 @pytest.fixture(autouse=True)
 def mock_get():
-    with patch("france_travail.offres.requests.get") as mock:
+    with patch("france_travail.offres.httpx.get") as mock:
         yield mock

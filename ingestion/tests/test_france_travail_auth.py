@@ -69,7 +69,7 @@ class TestInvalidateToken:
 @pytest.fixture(autouse=True)
 def mock_post():
     """Mock global de requests.post pour tous les tests de ce fichier."""
-    with patch("france_travail.auth.requests.post") as mock:
+    with patch("france_travail.auth.httpx.post") as mock:
         response = MagicMock()
         response.json.return_value = {
             "access_token": "fake_token_123",

@@ -119,7 +119,7 @@
     "intitule": "Consultant RPA (H/F)",
     "description": "BRAINLOGIC accompagne ses clients dans la réalisation de leurs projets digitaux. Depuis toutes ces années, riches en évolutions et en transformations, nous avons su rester à la pointe de la technologie et de l'innovation avec la même ambition : satisfaire nos clients en leur apportant nos conseils, nos expertises pour pouvoir les accompagner au mieux.\n\nDans le cadre du développement de notre client, acteur engagé du secteur des énergies renouvelables, nous recherchons un Consultant RPA UiPath expérimentée H/F pour rejoindre une équipe dynamique.\n\nVos missions :\nEn tant que Consultant RPA UiPath H/F, vous interviendrez sur toutes les phases des\nprojets d'automatisation :\n\n- Analyser les processus métiers et identifier les opportunités d'automatisation.\n- Concevoir, développer et déployer des solutions RPA à l'aide de UiPath\n- Participer à la définition de l'architecture technique et aux bonnes pratiques RPA.\n- Réaliser les tests unitaires, d'intégration et de validation avec les équipes métiers.\n- Assurer la maintenance, l'optimisation et la supervision des robots déployés.\n- Former et accompagner les utilisateurs dans la prise en main des outils.\n- Participer à la veille technologique sur les évolutions de l'écosystème UiPath et RPA.\n\nProfil recherché\n- Bac +3/5 en informatique, génie logiciel ou équivalent.\n- Expérience confirmée en développement et déploiement de solutions RPA avec UiPath.\n- Solides connaissances des outils UiPath (Studio, Orchestrator, Assistant, Document Understanding.).\n- Bonnes bases en .NET / C# / VB.NET, SQL, API REST, et en intégration de systèmes.\n- Capacité à comprendre les processus métiers et à communiquer efficacement avec les équipes fonctionnelles.\n- Esprit d'analyse, rigueur, autonomie et goût pour l'innovation.\n- Certification UiPath (Associate ou Advanced) appréciée.\n- La connaissance d'autres plateformes RPA (Automation Anywhere, Power Automate, Blue Prism.) est un plus.\n\nPourquoi nous rejoindre ?\n- Intégrer une équipe humaine, passionnée par l'automatisation.\n- Participer à des projets variés et à forte valeur ajoutée.\n- Environnement de travail flexible et bienveillant.",
     "dateCreation": "2026-02-26T09:55:27.951Z",
-    "dateActualisation": "2026-03-06T10:07:31.778Z",
+    "dateActualisation": "2026-03-13T10:22:44.904Z",
     "lieuTravail": {
       "libelle": "75 - Paris 1er Arrondissement",
       "codePostal": "75001",
@@ -816,6 +816,58 @@
     "employeurHandiEngage": false
   },
   {
+    "id": "0200828",
+    "intitule": "INGÉNIEUR EN INGÉNIERIE LOGICIELLE - H/F",
+    "description": "Description :\n\n\n_Dans le cadre d’un projet européen_ (Joint Action JARDIN), Orphanet cherche à renforcer son équipe de développeurs en recrutant un développeur (H/F) ANGULAR pour enrichir ses outils et interfaces et gérer les données de la base de connaissance.\n\nLa personne recrutée aura pour mission principale de participer au développement et à la finalisation des écrans de l’outil « RESTOR » (formulaires et processus permettant la gestion des données de la base de connaissance Orphanet).\n\nEn complément, en fonction des compétences PYTHON, la personne participera à la maintenance évolutive des APIs en interfaces en python qui utilisent également les données de la base.\n\nLes technologies majoritairement utilisées seront ANGULAR 18.2, javascript, ElasticSearch et les APIs formalisées au standard OpenAPI 3 (swagger).\n\nGithub servira à la gestion du code. Des compétences en JAVA seront utiles pour comprendre les services REST entre la base neo4J et les interfaces Angular.\n\nACTIVITÉS PRINCIPALES : \n\n\t* Développer et finaliser les écrans et processus Angular de gestion des données de la base graphe Neo4J.\n\t* Maintenir et faire évoluer les interfaces de visualisation et d'utilisation des données (API et applicatifs python)\n\nAutres informations : \n\nDate de prise de fonction : dès que possible\n\nCDD de 12 mois renouvelables\n\nTemps de travail :\n\n\t* temps plein\n\t* 38h30 hebdomadaires\n\t* 32 jours de congés annuels et 12 RTT : 44 jours\n\t* Possibilité de télétravail\n\nRÉMUNÉRATION : \nContractuels : à partir de 2 494 € brut mensuel en fonction de l'expérience professionnelle sur des postes de niveau équivalent (Barème de rémunération des contractuels Inserm).\n \n\n\t\t\n\t\t\nProfil recherché :\n\t\t\n\t\t\nCONNAISSANCES : \n\n\t* Maîtrise d’Angular\n\t* Maîtrise du langage Python (3)\n\t* Maîtrise d’Open API 3 et de SWAGGER\n\t* Maîtrise des principes de gestion de code sources (git, github)\n\t* Connaissance JAVA serait un plus\n\t* Connaissance d’ElasticSearch/Kibana (ELK) serait un plus\n\t* Anglais : oral et écrit de niveau C2- Cadre Européen commun de référence pour les langues\n\n \nSAVOIR-FAIRE : \n\n\t* Suivre ou mettre en place une méthodologie de projet et savoir la présenter (estimer, planifier, suivre)\n\t* Synthétiser ses résultats, bien commenter son code.\n\t* Savoir s’adapter aux évolutions des demandes métiers\n\t*  \n\n \n\nAPTITUDES : \n\n\t* Excellente capacité d’organisation afin de définir les priorités d’action\n\t* Esprit rigoureux et systématique\n\t* Autonomie\n\t* Savoir travailler en équipe, selon les méthodes AGILES\n\t* Être participatif, créatif et en recherche de solutions\n\nEXPÉRIENCE(S) SOUHAITÉ(S) : \n\n\t* Développement web en Python\n\t* Développement ou intégration d’API\n\t* Une expérience en bioinformatique serait un plus\n\nNIVEAU DE DIPLÔME ET FORMATION(S) : \n\n\t* Informaticien de niveau minimum Bac +3 \n(Master, Master Pro, Ingénieur, Licence pro ou expérience équivalente)\n\t* Une formation de bio-informaticien avec une forte composante en développement logiciel pourra également convenir. \n\t* Débutant accepté\n\n",
+    "dateCreation": "2026-03-12T19:33:45.000Z",
+    "dateActualisation": "2026-03-12T19:33:45.000Z",
+    "lieuTravail": {
+      "libelle": "75 - Paris 14e Arrondissement",
+      "latitude": 48.832769,
+      "longitude": 2.325738,
+      "codePostal": "75014",
+      "commune": "75114"
+    },
+    "romeCode": "M1805",
+    "romeLibelle": "Développeur / Développeuse informatique",
+    "appellationlibelle": "Développeur / Développeuse informatique",
+    "entreprise": {
+      "nom": "Inserm"
+    },
+    "typeContrat": "CDD",
+    "typeContratLibelle": "CDD - 12 Mois",
+    "natureContrat": "Contrat travail",
+    "experienceExige": "D",
+    "experienceLibelle": "Débutant accepté",
+    "salaire": {},
+    "dureeTravailLibelle": "\nTravail en journée",
+    "complementExercice": "Temps plein",
+    "alternance": false,
+    "contact": {},
+    "nombrePostes": 1,
+    "codeNAF": "72.19Z",
+    "secteurActivite": "72",
+    "secteurActiviteLibelle": "Recherche-développement en autres sciences physiques et naturelles",
+    "origineOffre": {
+      "origine": "2",
+      "urlOrigine": "https://candidat.francetravail.fr/offres/recherche/detail/0200828",
+      "partenaires": [
+        {
+          "nom": "SOFTY",
+          "url": "https://inserm.softy.pro/offre/197225?idt=5&h=1972250",
+          "logo": "https://www.francetravail.fr/logos/img/partenaires/softy80.png"
+        }
+      ]
+    },
+    "contexteTravail": {
+      "horaires": [
+        "\nTravail en journée"
+      ]
+    },
+    "entrepriseAdaptee": false,
+    "employeurHandiEngage": false
+  },
+  {
     "id": "0197876",
     "intitule": "Développeur (H/F)",
     "description": "Description du poste :\nEn tant qu'organisateur de forums de recrutement, Talents Handicap accompagne de très nombreuses entreprises & organisations en France dans leurs recrutements de collaborateurs en situation de handicap. Participant actuellement à l'un de nos forums.\nL'entreprise Capgemini recherche actuellement des profils :\nMissions\n* Accompagner les directions d'entreprises dans l'élaboration de leur stratégie de mise en place de la plateforme ServiceNow ***Elaborer et optimiser les processus techniques, en adhérence avec les bonnes pratiques de la plateformeServiceNow***Concevoir et développer des outils ITSM***Configurer et d'optimiser régulièrement la plateforme ServiceNow lors de son déploiement au sein de l'organisation***Concevoir des solutions techniques les plus pertinentes en respectant les bonnes pratiques. ",
@@ -948,7 +1000,7 @@
     "intitule": "DÉVELOPPEUR JAVA H/F - H/F",
     "description": "Description :\n\n\nPour soutenir notre forte croissance, nous recherchons un·e Développeur·euse Java au sein de notre équipe R&D.\n\nAttaché(e) à la Team Lead Access Manager vous développerez les fonctionnalités Portal de notre « Bastion » sur JAVA (JAVA8). L’Access Manager est une application Web qui permet l’accès aux targets à distance via le navigateur, sans passer par des clients lourds : les protocoles RDP et SSH sont utilisés.\n\nL’Access Manager est vendu avec le Bastion, notre produit phare, et a commencé à être développé il y a 15 ans.\n\nAu sein de l’équipe Access Manager composée de 7 personnes basées entre Paris et Rennes, votre rôle sera d’œuvrer pour l’amélioration continue de l’AM, la réduction de sa dette technique et le développement de nouvelles fonctionnalités.\n\nDans ce cadre, vos missions seront :\n\n\t*\nDéveloppement d’application Web ;\n\n\t*\nGestion de Bases de données (MariaDB) ;\n\n\t*\nGestion d’Authentifications (MFA, Kerberos, RADIUS, LDAP / Active Directory…) ;\n\n\t*\nRefonte complète de l’interface graphique;\n\n\t*\nDéveloppement d’une nouvelle API Rest.\n\n\n\t\t\n\t\t\nProfil recherché :\n\t\t\n\t\t\nEXPÉRIENCE\n\n\t*\n5 à 7 ans d’expérience\n\n\t*\nMaîtrise de javascript, Java et React\n\n\t*\nExpert base de données\n\n\t*\nbonne vision de tous les aspects d’une infrastructure informatique\n\nSOFT SKILLS\n\n\t*\ncurieux, envie d’apprendre\n\n\t*\nforce de proposition\n\n \n\nWALLIX, C’EST AUSSI :\n\n- Un environnement structuré… qui n’a pas perdu son âme de start-up\n\n- Une évolution à double sens : vous évoluez avec nous… et nous évoluons avec vous\n\n- Une entreprise « à taille humaine », qui place l’intégration et l’épanouissement de ses « Wallixien(ne)s » au cœur de ses préoccupations\n\n\t*\nLABEL HAPPY AT WORK 2020, 2021, 2022 et 2024\n\n\t*\nSéminaire d’intégration & déjeuner, Kick-Off dans de belles destinations ou en remote\n\n\t*\nCHARTE DU TÉLÉTRAVAIL (2 jours par semaine), 25 JOURS de congés payés & 12 RTT (1 par mois)\n\n\t*\nPossibilité de mobilité interne pour explorer de nouveaux défis,\n\n\t*\nParticipation à 50 % des frais de transport\n\n\t*\nMutuelle et prévoyance\n\n\t*\nPrime de vacances\n\n\t*\nCARTE SWILE avec une provision de 10,5 € par jour (50 % de contribution de l’employé)\n\n\t*\nCSE\n\n\t*\nBonne humeur et super équipe !\n\nIF YOU’RE UP FOR THIS EXCITING CHALLENGE, GET READY TO EMBARK ON A THRILLING ADVENTURE IN THE WORLD OF TECHNOLOGY AT WALLIX !\n",
     "dateCreation": "2026-03-11T19:33:46.000Z",
-    "dateActualisation": "2026-03-11T19:33:46.000Z",
+    "dateActualisation": "2026-03-12T19:33:55.000Z",
     "lieuTravail": {
       "libelle": "75 - Paris 8e Arrondissement",
       "latitude": 48.877495,
@@ -1246,7 +1298,7 @@
     "intitule": "LEAD DEVELOPER - H/F",
     "description": "Description :\n\n\nNous souhaitons renforcer notre capacité à concevoir, développer et maintenir des solutions internes et clients performantes et durables.  \n\nVotre mission en tant que Lead Developer s’articule autour de trois grandes responsabilités : \n\n\t* TECHNIQUE : garantir la qualité et la cohérence de l’architecture, prendre les décisions technologiques structurantes, maintenir les standards de code et anticiper la dette technique, participer au développement.\n\n\t* HUMAIN : encadrer et faire monter en compétences les développeurs, faciliter la collaboration au sein de l’équipe, être un point de référence et débloquer les situations complexes. \n\n\t* STRATÉGIQUE : faire le pont entre le métier/product et l’équipe technique, prioriser les efforts et challenger les besoins afin d’éviter la sur-ingénierie. \n\n \n\n \n\nAu sein de notre département SI, rattaché(e) au pôle applicatif, le rôle de Lead Developer est central dans cette dynamique. Vous contribuerez directement à structurer nos pratiques de développement, à assurer la qualité technique de nos applications et à guider les choix technologiques sur des projets stratégiques. \n\nCe poste intervient dans un contexte où la standardisation des pratiques et la montée en compétence de l’équipe sont des enjeux clés.  \n\n \n\nVOUS TRAVAILLEREZ EN ÉTROITE COLLABORATION AVEC :\n\n\t* Les équipes de développement et les QA (testeurs)\n\t* Les Product Owners  \n\t* Les équipes IT infrastructure   \n\t* Les interlocuteurs métiers \n\n \n\nVOS MISSIONS : \n\n \n\nARCHITECTURE & EXPERTISE TECHNIQUE : \n\n\t* Accompagner et conseiller sur le choix des solutions technologiques à mettre en œuvre\n\t* Participer à la conception, à l’architecture et aux études de faisabilité\n\t* Assurer une veille technologique sur les langages, architectures, cloud, sécurité \n\nDÉVELOPPEMENT & QUALITÉ : \n\n\t* Développer et maintenir les outils et solutions selon la feuille de route\n\t* Garantir la qualité du code, le respect des bonnes pratiques (tests, performance, sécurité) et l’IaC (Infrastructure as Code)\n\t* Mettre en place et améliorer les environnements et outils de développement\n\t* Participer aux tests, UAT et support Niveau 3 \n\nPILOTAGE TRANSVERSAL & ANIMATION : \n\n\t* Accompagner, guider et faire monter en compétence les développeurs\n\t* Favoriser le partage de connaissances et l’esprit d’équipe\n\t* Animer des présentations techniques et de l’évangélisation sur nos outils \n\nMÉTHODES & ORGANISATION : \n\n\t* Travailler dans un contexte Agile (Scrum) avec intégration continue\n\t* Documenter les applications et rédiger les dossiers techniques\n\t* Détecter et résoudre les problèmes de communication et de coordination dans l’équipe \n\n\n\t\t\n\t\t\nProfil recherché :\n\t\t\n\t\t\n\t* Formation supérieure en école d’Ingénieur en informatique (EPITA, EPITECH, EFREI, etc.) ou équivalent\n\t* Expérience significative en développement et en architecture technique\n\t* COMPÉTENCES TECHNIQUES : C#, ANGULAR, SQL SERVER, NOSQL, AZURE, TERRAFORM\n\t* Maîtrise des bonnes pratiques de développement et de la méthodologie Agile (Scrum)\n\t* Expérience avec AZURE DEVOPS\n\t* Capacités à communiquer, documenter et à transmettre ses connaissances\n\t* Rigueur, autonomie, esprit d’initiative, travail en équipe et sens de l’innovation\n\t* Leadership naturel: capacité à fédérer une équipe, à prendre des décisions avec clarté et à embarquer les autres dans une vision technique commune\n\t* La méthodologie SAFe serait un plus. \n\n \n\n \n\nCE QUE LE POSTE OFFRE :\n\n\t* Un rôle clé dans l’amélioration et la structuration des pratiques techniques\n\t* La possibilité de piloter des choix technologiques stratégiques\n\t* Un impact direct sur la qualité, la performance et l’innovation des solutions\n\t* Un environnement Agile où le test, l’apprentissage et l’autonomie sont encouragés \n\n \n\n \n\nINFORMATIONS COMPLÉMENTAIRES : \n\nConvention Syntec 1486. \n\n \n\n \n\nPOURQUOI GS1? \n\nUne diversité d’écosystèmes et d’enjeux : digitalisation des chaines de valeur, continuité numérique, efficience opérationnelle, économie circulaire, traçabilité, réglementation, conformité & sécurité… ; \n\nUn engagement concret pour accompagner la mutation des écosystèmes de l’économie de la propriété vers l’économie de la fonctionnalité, au bénéfice d’une société à la fois plus responsable et diversifiée ; \n\nUn rôle central dans l’engagement de communautés d’acteurs au sein d’une organisation locale et internationale ; \n\nUne atmosphère de travail coopérative et stimulante, une équipe conviviale et engagée, dans des locaux modernes au cœur de Paris. \n\n \n\n \n\nPROCESSUS DE CANDIDATURE :\n\n\t* PRÉQUALIFICATION TÉLÉPHONIQUE avec la Talent Manager\n\t* ENTRETIEN PHYSIQUE avec le Responsable du Pôle Applicatif et un Lead Dev afin d’échanger sur l’adéquation opérationnelle avec le poste et incluant une évaluation technique\n\t* ENTRETIEN RH en Teams avec la Talent Manager\n\t* ENTRETIEN FINAL avec le Responsable des Systèmes d’Information et la Directrice Développement RH\n\n \n\n \n\n_Vous vous êtes reconnu.e ? Alors rejoignez-nous en postulant à ce...",
     "dateCreation": "2026-02-27T19:33:47.000Z",
-    "dateActualisation": "2026-03-11T19:34:14.000Z",
+    "dateActualisation": "2026-03-12T19:34:17.000Z",
     "lieuTravail": {
       "libelle": "75 - Paris 9e Arrondissement",
       "latitude": 48.872479,
@@ -1628,7 +1680,7 @@
     "intitule": "Développeur java (H/F)",
     "description": "Votre tâche (…si vous l’acceptez !) :Vous effectuez majoritairement du développement en Java 21 et springboot 3.0, en respectant les bonnes pratiques de qualité, de performance et de sécurité.Vous êtes impliqué à la fois sur le build et sur le run, en participant à toutes les étapes du cycle de vie des applications.Vous participez aussi à d’autres activités, telles que la conception et l’utilisation d’API, la réalisation de tests métiers et techniques, le déploiement et le suivi de production.Vous travaillez dans un environnement technique innovant, basé sur des technologies telles que Mongo Atlas, MSK, Kubernetes, Datadog et Elasticache.Votre future équipe :Vous intégrez une tribu agile composée de Développeurs, de Product Owners, de Scrum Masters et de Devops.",
     "dateCreation": "2026-02-16T04:01:36.000Z",
-    "dateActualisation": "2026-03-12T04:13:26.000Z",
+    "dateActualisation": "2026-03-13T04:13:40.000Z",
     "lieuTravail": {
       "libelle": "75 - Paris 1er Arrondissement",
       "codePostal": "75001",

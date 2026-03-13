@@ -1,7 +1,9 @@
 import os
 import time
-import requests
-from ingestion.france_travail.config import TOKEN_URL, SCOPE
+from urllib import response
+import httpx 
+from config import TOKEN_URL, SCOPE
+# tenacity
 
 CLIENT_ID = os.getenv("CLIENT_ID")
 CLIENT_SECRET = os.getenv("CLIENT_SECRET")
@@ -26,7 +28,7 @@ def get_token() -> str:
         "scope": SCOPE
     }
 
-    response = requests.post(TOKEN_URL, data=data, headers=headers)
+    response = httpx.post(TOKEN_URL, data=data, headers=headers)
     response.raise_for_status()
     token_info = response.json()
 
