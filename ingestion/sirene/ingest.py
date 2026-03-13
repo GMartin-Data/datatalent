@@ -6,18 +6,20 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-import pyarrow.parquet as pq
-import requests
+import httpx
+from shared.bigquery import load_gcs_to_bq
+from shared.gcs import upload_to_gcs
+from shared.logging import get_logger
 from sirene.config import (
     CHUNK_SIZE,
     DATA_GOUV_API_DATASET_URL,
     HTTP_TIMEOUT_SECONDS,
-    MAX_RESOURCE_AGE_DAYS,
-    PREPARED_DIR,
     RAW_DIR,
-    RESOURCE_SELECTED_COLUMNS,
     SIRENE_RESOURCES,
 )
+from tenacity import retry, stop_after_attempt, wait_exponential
+
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -30,21 +32,33 @@ class ResourceInfo:
     last_modified: datetime
     download_url: str
     filename_prefix: str
+    bq_table: str
 
 
-def log(message: str) -> None:
-    print(message, flush=True)
+def configure_logging() -> None:
+    """Conserve un point d'entrée compatible avec les tests existants."""
+    return None
 
 
 def ensure_directories() -> None:
     RAW_DIR.mkdir(parents=True, exist_ok=True)
-    PREPARED_DIR.mkdir(parents=True, exist_ok=True)
 
 
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, max=10),
+    reraise=True,
+)
 def fetch_dataset_metadata() -> dict[str, Any]:
-    response = requests.get(DATA_GOUV_API_DATASET_URL, timeout=HTTP_TIMEOUT_SECONDS)
-    response.raise_for_status()
-    return response.json()
+    logger.info("dataset_metadata_fetch_started", url=DATA_GOUV_API_DATASET_URL)
+
+    with httpx.Client(timeout=HTTP_TIMEOUT_SECONDS, follow_redirects=True) as client:
+        response = client.get(DATA_GOUV_API_DATASET_URL)
+        response.raise_for_status()
+        payload = response.json()
+
+    logger.info("dataset_metadata_fetch_succeeded")
+    return payload
 
 
 def parse_iso_datetime(value: str) -> datetime:
@@ -96,6 +110,7 @@ def build_resource_info(
         last_modified=parse_iso_datetime(resource_last_modified),
         download_url=download_url,
         filename_prefix=resource_cfg["filename_prefix"],
+        bq_table=resource_cfg["bq_table"],
     )
 
 
@@ -107,19 +122,6 @@ def validate_resource_format(resource: ResourceInfo, expected_format: str) -> No
         )
 
 
-def validate_resource_freshness(
-    resource: ResourceInfo, max_age_days: int = MAX_RESOURCE_AGE_DAYS
-) -> None:
-    now_utc = datetime.now(UTC)
-    age_days = (now_utc - resource.last_modified).days
-
-    if age_days > max_age_days:
-        raise ValueError(
-            f"Ressource trop ancienne pour {resource.logical_name}: "
-            f"{resource.last_modified.isoformat()} ({age_days} jours)."
-        )
-
-
 def build_month_tag(resource: ResourceInfo) -> str:
     return resource.last_modified.strftime("%Y-%m")
 
@@ -128,193 +130,188 @@ def build_raw_filename(resource: ResourceInfo) -> str:
     return f"{resource.filename_prefix}_{build_month_tag(resource)}.parquet"
 
 
-def build_prepared_filename(resource: ResourceInfo) -> str:
-    return f"{resource.filename_prefix}_{build_month_tag(resource)}_light.parquet"
+def validate_parquet_magic_number(file_path: Path) -> None:
+    with open(file_path, "rb") as file_handle:
+        header = file_handle.read(4)
+
+    if header != b"PAR1":
+        raise ValueError(
+            f"Le fichier téléchargé n'est pas un parquet valide "
+            f"(magic number invalide) : {file_path}"
+        )
 
 
-def cleanup_old_versions(
-    directory: Path, filename_prefix: str, keep_filename: str
+def format_size(num_bytes: int | None) -> str:
+    if num_bytes is None:
+        return "taille inconnue"
+
+    size = float(num_bytes)
+    units = ["octets", "Ko", "Mo", "Go", "To"]
+    unit_index = 0
+
+    while size >= 1024 and unit_index < len(units) - 1:
+        size /= 1024
+        unit_index += 1
+
+    if unit_index == 0:
+        return f"{int(size)} {units[unit_index]}"
+    return f"{size:.2f} {units[unit_index]}"
+
+
+def log_download_progress(
+    downloaded_bytes: int, total_bytes: int | None, logical_name: str
 ) -> None:
-    for file_path in directory.glob(f"{filename_prefix}_*.parquet"):
-        if file_path.name != keep_filename and file_path.is_file():
-            file_path.unlink()
+    if total_bytes and total_bytes > 0:
+        percent = (downloaded_bytes / total_bytes) * 100
+        logger.info(
+            "resource_download_progress",
+            logical_name=logical_name,
+            percent=round(percent, 1),
+            downloaded_bytes=downloaded_bytes,
+            total_bytes=total_bytes,
+            downloaded_size=format_size(downloaded_bytes),
+            total_size=format_size(total_bytes),
+        )
+    else:
+        logger.info(
+            "resource_download_progress",
+            logical_name=logical_name,
+            downloaded_bytes=downloaded_bytes,
+            downloaded_size=format_size(downloaded_bytes),
+            total_size="taille inconnue",
+        )
 
 
-def get_content_length(
-    headers: requests.structures.CaseInsensitiveDict[str],
-) -> int | None:
-    raw_value = headers.get("Content-Length")
-    if raw_value is None:
-        return None
-    try:
-        return int(raw_value)
-    except ValueError:
-        return None
-
-
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, max=10),
+    reraise=True,
+)
 def download_file(resource: ResourceInfo, destination: Path) -> None:
     temp_path = destination.with_suffix(destination.suffix + ".part")
 
-    with requests.get(
-        resource.download_url, stream=True, timeout=HTTP_TIMEOUT_SECONDS
-    ) as response:
-        response.raise_for_status()
-
-        final_url = response.url.lower()
-        content_type = (response.headers.get("Content-Type") or "").lower()
-        content_length = get_content_length(response.headers)
-
-        if (
-            not final_url.endswith(".parquet")
-            and "parquet" not in content_type
-            and "octet-stream" not in content_type
-        ):
-            raise ValueError(
-                f"Le téléchargement reçu ne ressemble pas à un parquet : "
-                f"url finale={response.url}, content-type={content_type}"
-            )
-
-        downloaded_bytes = 0
-        with open(temp_path, "wb") as file_handle:
-            for chunk in response.iter_content(chunk_size=CHUNK_SIZE):
-                if not chunk:
-                    continue
-                file_handle.write(chunk)
-                downloaded_bytes += len(chunk)
-
-    if content_length is not None and downloaded_bytes != content_length:
-        temp_path.unlink(missing_ok=True)
-        raise ValueError(
-            f"Téléchargement incomplet pour {resource.logical_name}: "
-            f"{downloaded_bytes} octets reçus sur {content_length} attendus."
-        )
-
-    temp_path.replace(destination)
-
-
-def select_existing_columns(
-    available_columns: list[str], required_columns: list[str]
-) -> list[str]:
-    available_set = set(available_columns)
-    return [col for col in required_columns if col in available_set]
-
-
-def transform_parquet_keep_columns(
-    source_path: Path,
-    destination_path: Path,
-    selected_columns: list[str],
-) -> list[str]:
-    """
-    Seule opération de traitement :
-    - lire le parquet source
-    - garder uniquement les colonnes demandées si elles existent
-    - réécrire un parquet allégé
-
-    Aucune transformation métier sur les valeurs.
-    """
-    parquet_file = pq.ParquetFile(source_path)
-    available_columns = parquet_file.schema_arrow.names
-    kept_columns = select_existing_columns(available_columns, selected_columns)
-
-    if not kept_columns:
-        raise ValueError(
-            f"Aucune colonne demandée n'a été trouvée dans {source_path.name}. "
-            f"Colonnes demandées={selected_columns}"
-        )
-
-    temp_path = destination_path.with_suffix(destination_path.suffix + ".part")
-
-    table = pq.read_table(source_path, columns=kept_columns)
-
-    pq.write_table(
-        table,
-        temp_path,
-        compression="zstd",
-        use_dictionary=True,
+    logger.info(
+        "resource_download_started",
+        logical_name=resource.logical_name,
+        download_url=resource.download_url,
+        destination=str(destination),
     )
 
-    temp_path.replace(destination_path)
-    return kept_columns
+    with httpx.Client(timeout=HTTP_TIMEOUT_SECONDS, follow_redirects=True) as client:
+        with client.stream("GET", resource.download_url) as response:
+            response.raise_for_status()
+
+            content_length_header = response.headers.get("Content-Length")
+            total_bytes = (
+                int(content_length_header)
+                if content_length_header and content_length_header.isdigit()
+                else None
+            )
+
+            logger.info(
+                "resource_size_announced",
+                logical_name=resource.logical_name,
+                total_bytes=total_bytes,
+                total_size=format_size(total_bytes),
+            )
+
+            downloaded_bytes = 0
+            next_log_threshold = 100 * 1024 * 1024  # 100 Mo
+            first_log = True
+
+            with open(temp_path, "wb") as file_handle:
+                for chunk in response.iter_bytes(chunk_size=CHUNK_SIZE):
+                    if not chunk:
+                        continue
+
+                    file_handle.write(chunk)
+                    downloaded_bytes += len(chunk)
+
+                    if first_log or downloaded_bytes >= next_log_threshold:
+                        log_download_progress(
+                            downloaded_bytes, total_bytes, resource.logical_name
+                        )
+                        first_log = False
+                        next_log_threshold = downloaded_bytes + 100 * 1024 * 1024
+
+    temp_path.replace(destination)
+    validate_parquet_magic_number(destination)
+
+    logger.info(
+        "resource_download_succeeded",
+        logical_name=resource.logical_name,
+        destination=str(destination),
+        size_bytes=destination.stat().st_size,
+        size=format_size(destination.stat().st_size),
+    )
 
 
 def process_one_resource(
     logical_name: str,
     resource_cfg: dict[str, str],
     dataset_metadata: dict[str, Any],
-) -> tuple[Path, Path]:
+) -> str:
     resource = build_resource_info(logical_name, resource_cfg, dataset_metadata)
 
-    log(f"\n=== {logical_name.upper()} ===")
-    log(f"Titre ressource              : {resource.title}")
-    log(f"Resource ID                  : {resource.resource_id}")
-    log(f"Format                       : {resource.format}")
-    log(f"Dernière modification API    : {resource.last_modified.isoformat()}")
+    logger.info(
+        "resource_processing_started",
+        logical_name=resource.logical_name,
+        title=resource.title,
+        format=resource.format,
+        last_modified=resource.last_modified.isoformat(),
+        bq_table=resource.bq_table,
+    )
 
     validate_resource_format(resource, resource_cfg["expected_format"])
-    validate_resource_freshness(resource)
 
     raw_filename = build_raw_filename(resource)
-    prepared_filename = build_prepared_filename(resource)
-
     raw_path = RAW_DIR / raw_filename
-    prepared_path = PREPARED_DIR / prepared_filename
-
-    log(f"Nom local raw                : {raw_filename}")
-    log(f"Nom local prepared           : {prepared_filename}")
-    log("Téléchargement du parquet brut...")
 
     download_file(resource, raw_path)
 
     if not raw_path.exists() or raw_path.stat().st_size == 0:
-        raise ValueError(f"Le fichier brut téléchargé est absent ou vide : {raw_path}")
+        raise ValueError(f"Le fichier téléchargé est absent ou vide : {raw_path}")
 
-    requested_columns = RESOURCE_SELECTED_COLUMNS[logical_name]
-    log(f"Sous-sélection des colonnes ({len(requested_columns)} colonnes demandées)...")
-
-    kept_columns = transform_parquet_keep_columns(
-        source_path=raw_path,
-        destination_path=prepared_path,
-        selected_columns=requested_columns,
+    logger.info(
+        "local_file_ready",
+        logical_name=resource.logical_name,
+        local_path=str(raw_path),
+        size_bytes=raw_path.stat().st_size,
+        size=format_size(raw_path.stat().st_size),
     )
 
-    if not prepared_path.exists() or prepared_path.stat().st_size == 0:
-        raise ValueError(f"Le fichier préparé est absent ou vide : {prepared_path}")
+    gcs_uri = upload_to_gcs(str(raw_path), "sirene")
+    logger.info(
+        "resource_uploaded_to_gcs",
+        logical_name=resource.logical_name,
+        gcs_uri=gcs_uri,
+    )
 
-    cleanup_old_versions(RAW_DIR, resource.filename_prefix, raw_path.name)
-    cleanup_old_versions(PREPARED_DIR, resource.filename_prefix, prepared_path.name)
+    load_gcs_to_bq(gcs_uri, "raw", resource.bq_table)
+    logger.info(
+        "resource_loaded_to_bq",
+        logical_name=resource.logical_name,
+        gcs_uri=gcs_uri,
+        bq_table=f"raw.{resource.bq_table}",
+    )
 
-    raw_size_mb = raw_path.stat().st_size / (1024 * 1024)
-    prepared_size_mb = prepared_path.stat().st_size / (1024 * 1024)
-
-    log(f"Colonnes conservées          : {len(kept_columns)}")
-    log(f"Taille raw                   : {raw_size_mb:.2f} Mo")
-    log(f"Taille prepared              : {prepared_size_mb:.2f} Mo")
-    log(f"Raw OK                       : {raw_path}")
-    log(f"Prepared OK                  : {prepared_path}")
-
-    if prepared_path.stat().st_size >= raw_path.stat().st_size:
-        log(
-            "[ATTENTION] Le parquet allégé reste plus lourd ou équivalent au brut. "
-            "Cela peut venir de la stratégie de compression du fichier source. "
-            "Le sous-ensemble de colonnes a bien été appliqué, mais la réécriture "
-            "Parquet n'est pas forcément plus compacte que celle du fournisseur."
-        )
-
-    return raw_path, prepared_path
+    return gcs_uri
 
 
-def run() -> list[tuple[Path, Path]]:
+def run() -> list[str]:
+    configure_logging()
     ensure_directories()
-    log("Récupération des métadonnées du dataset Sirene...")
+
+    logger.info("sirene_ingestion_started")
     dataset_metadata = fetch_dataset_metadata()
 
-    outputs: list[tuple[Path, Path]] = []
+    outputs: list[str] = []
     for logical_name, resource_cfg in SIRENE_RESOURCES.items():
         outputs.append(
             process_one_resource(logical_name, resource_cfg, dataset_metadata)
         )
 
-    log("\nExtraction et allègement terminés avec succès.")
+    logger.info("sirene_ingestion_succeeded", resource_count=len(outputs))
     return outputs
 
 
@@ -322,5 +319,5 @@ if __name__ == "__main__":
     try:
         run()
     except Exception as exc:
-        log(f"\n[ERREUR] {exc}")
+        logger.exception("sirene_ingestion_failed", error=str(exc))
         sys.exit(1)

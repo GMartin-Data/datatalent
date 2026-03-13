@@ -1,19 +1,16 @@
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from pathlib import Path
 
-import pyarrow as pa
-import pyarrow.parquet as pq
 import pytest
 from sirene.ingest import (
     ResourceInfo,
-    build_prepared_filename,
     build_raw_filename,
+    build_resource_info,
     parse_iso_datetime,
+    process_one_resource,
     run,
-    select_existing_columns,
-    transform_parquet_keep_columns,
+    validate_parquet_magic_number,
     validate_resource_format,
-    validate_resource_freshness,
 )
 
 
@@ -23,6 +20,7 @@ def make_resource(
     fmt: str = "parquet",
     last_modified: datetime | None = None,
     filename_prefix: str = "StockUniteLegale",
+    bq_table: str = "sirene_unite_legale",
 ) -> ResourceInfo:
     if last_modified is None:
         last_modified = datetime.now(UTC)
@@ -36,6 +34,7 @@ def make_resource(
         last_modified=last_modified,
         download_url="https://example.com/test.parquet",
         filename_prefix=filename_prefix,
+        bq_table=bq_table,
     )
 
 
@@ -56,24 +55,6 @@ def test_build_raw_filename():
     assert build_raw_filename(resource) == "StockUniteLegale_2026-03.parquet"
 
 
-def test_build_prepared_filename():
-    dt = datetime(2026, 3, 5, 10, 30, tzinfo=UTC)
-    resource = make_resource(last_modified=dt, filename_prefix="StockEtablissement")
-
-    assert (
-        build_prepared_filename(resource) == "StockEtablissement_2026-03_light.parquet"
-    )
-
-
-def test_select_existing_columns_preserves_required_order():
-    available = ["col_a", "col_b", "col_c", "col_d"]
-    required = ["col_c", "col_x", "col_a"]
-
-    result = select_existing_columns(available, required)
-
-    assert result == ["col_c", "col_a"]
-
-
 def test_validate_resource_format_ok():
     resource = make_resource(fmt="parquet")
     validate_resource_format(resource, "parquet")
@@ -86,73 +67,134 @@ def test_validate_resource_format_raises_for_wrong_format():
         validate_resource_format(resource, "parquet")
 
 
-def test_validate_resource_freshness_ok():
-    recent_dt = datetime.now(UTC) - timedelta(days=5)
-    resource = make_resource(last_modified=recent_dt)
+def test_validate_parquet_magic_number_ok(tmp_path: Path):
+    parquet_path = tmp_path / "test.parquet"
+    parquet_path.write_bytes(b"PAR1rest_of_fake_file")
 
-    validate_resource_freshness(resource, max_age_days=45)
-
-
-def test_validate_resource_freshness_raises_for_old_resource():
-    old_dt = datetime.now(UTC) - timedelta(days=90)
-    resource = make_resource(last_modified=old_dt)
-
-    with pytest.raises(ValueError, match="Ressource trop ancienne"):
-        validate_resource_freshness(resource, max_age_days=45)
+    validate_parquet_magic_number(parquet_path)
 
 
-def test_transform_parquet_keep_columns_writes_only_selected_columns(tmp_path: Path):
-    source_path = tmp_path / "source.parquet"
-    destination_path = tmp_path / "prepared.parquet"
+def test_validate_parquet_magic_number_raises(tmp_path: Path):
+    bad_file = tmp_path / "bad.parquet"
+    bad_file.write_bytes(b"XXXXnot_parquet")
 
-    table = pa.table(
-        {
-            "siren": ["111", "222"],
-            "nom": ["A", "B"],
-            "categorie": ["X", "Y"],
-            "extra": [1, 2],
-        }
-    )
-    pq.write_table(table, source_path)
-
-    kept_columns = transform_parquet_keep_columns(
-        source_path=source_path,
-        destination_path=destination_path,
-        selected_columns=["nom", "siren"],
-    )
-
-    assert kept_columns == ["nom", "siren"]
-    assert destination_path.exists()
-
-    result = pq.read_table(destination_path)
-    assert result.column_names == ["nom", "siren"]
-    assert result.num_rows == 2
+    with pytest.raises(ValueError, match="magic number invalide"):
+        validate_parquet_magic_number(bad_file)
 
 
-def test_transform_parquet_keep_columns_raises_if_no_requested_column_exists(
-    tmp_path: Path,
-):
-    source_path = tmp_path / "source.parquet"
-    destination_path = tmp_path / "prepared.parquet"
+def test_validate_parquet_magic_number_raises_on_empty_file(tmp_path: Path):
+    empty_file = tmp_path / "empty.parquet"
+    empty_file.write_bytes(b"")
 
-    table = pa.table(
-        {
-            "col1": [1, 2],
-            "col2": [3, 4],
-        }
-    )
-    pq.write_table(table, source_path)
+    with pytest.raises(ValueError, match="magic number invalide"):
+        validate_parquet_magic_number(empty_file)
 
-    with pytest.raises(ValueError, match="Aucune colonne demandée"):
-        transform_parquet_keep_columns(
-            source_path=source_path,
-            destination_path=destination_path,
-            selected_columns=["inexistante_a", "inexistante_b"],
-        )
+
+def test_build_resource_info_raises_if_last_modified_missing():
+    dataset_metadata = {
+        "resources": [
+            {
+                "id": "abc-resource",
+                "format": "parquet",
+                "mime": "application/octet-stream",
+                "title": "Test resource",
+                "latest": "https://example.com/test.parquet",
+            }
+        ]
+    }
+
+    resource_cfg = {
+        "resource_id": "abc-resource",
+        "expected_format": "parquet",
+        "filename_prefix": "StockUniteLegale",
+        "bq_table": "sirene_unite_legale",
+    }
+
+    with pytest.raises(ValueError, match="last_modified"):
+        build_resource_info("unite_legale", resource_cfg, dataset_metadata)
+
+
+def test_build_resource_info_raises_if_download_url_missing():
+    dataset_metadata = {
+        "resources": [
+            {
+                "id": "abc-resource",
+                "format": "parquet",
+                "mime": "application/octet-stream",
+                "title": "Test resource",
+                "last_modified": "2026-03-11T10:00:00Z",
+            }
+        ]
+    }
+
+    resource_cfg = {
+        "resource_id": "abc-resource",
+        "expected_format": "parquet",
+        "filename_prefix": "StockUniteLegale",
+        "bq_table": "sirene_unite_legale",
+    }
+
+    with pytest.raises(ValueError, match="ni 'latest' ni 'url'"):
+        build_resource_info("unite_legale", resource_cfg, dataset_metadata)
+
+
+def test_process_one_resource_downloads_uploads_and_loads(monkeypatch, tmp_path: Path):
+    fake_metadata = {
+        "resources": [
+            {
+                "id": "abc-resource",
+                "format": "parquet",
+                "mime": "application/octet-stream",
+                "title": "Test resource",
+                "last_modified": "2026-03-11T10:00:00Z",
+                "latest": "https://example.com/test.parquet",
+            }
+        ]
+    }
+
+    resource_cfg = {
+        "resource_id": "abc-resource",
+        "expected_format": "parquet",
+        "filename_prefix": "StockUniteLegale",
+        "bq_table": "sirene_unite_legale",
+    }
+
+    calls: dict[str, str] = {}
+
+    monkeypatch.setattr("sirene.ingest.RAW_DIR", tmp_path)
+
+    def fake_download_file(resource, destination):
+        Path(destination).write_bytes(b"PAR1fakecontent")
+        calls["download_destination"] = str(destination)
+
+    def fake_upload_to_gcs(local_path, gcs_prefix):
+        calls["upload_local_path"] = local_path
+        calls["upload_prefix"] = gcs_prefix
+        return "gs://datatalent-raw/sirene/2026-03-13/test.parquet"
+
+    def fake_load_gcs_to_bq(gcs_uri, dataset, table):
+        calls["load_gcs_uri"] = gcs_uri
+        calls["load_dataset"] = dataset
+        calls["load_table"] = table
+
+    monkeypatch.setattr("sirene.ingest.download_file", fake_download_file)
+    monkeypatch.setattr("sirene.ingest.upload_to_gcs", fake_upload_to_gcs)
+    monkeypatch.setattr("sirene.ingest.load_gcs_to_bq", fake_load_gcs_to_bq)
+
+    gcs_uri = process_one_resource("unite_legale", resource_cfg, fake_metadata)
+
+    assert gcs_uri == "gs://datatalent-raw/sirene/2026-03-13/test.parquet"
+    assert calls["upload_prefix"] == "sirene"
+    assert calls["load_dataset"] == "raw"
+    assert calls["load_table"] == "sirene_unite_legale"
+    assert calls["upload_local_path"].endswith("StockUniteLegale_2026-03.parquet")
 
 
 def test_run_calls_process_for_each_resource(monkeypatch):
     calls = []
+
+    def fake_configure_logging():
+        return None
 
     def fake_ensure_directories():
         return None
@@ -162,11 +204,9 @@ def test_run_calls_process_for_each_resource(monkeypatch):
 
     def fake_process_one_resource(logical_name, resource_cfg, dataset_metadata):
         calls.append((logical_name, resource_cfg, dataset_metadata))
-        return (
-            Path(f"/tmp/{logical_name}_raw.parquet"),
-            Path(f"/tmp/{logical_name}_prepared.parquet"),
-        )
+        return f"gs://datatalent-raw/sirene/2026-03-13/{logical_name}.parquet"
 
+    monkeypatch.setattr("sirene.ingest.configure_logging", fake_configure_logging)
     monkeypatch.setattr("sirene.ingest.ensure_directories", fake_ensure_directories)
     monkeypatch.setattr(
         "sirene.ingest.fetch_dataset_metadata", fake_fetch_dataset_metadata
@@ -177,5 +217,6 @@ def test_run_calls_process_for_each_resource(monkeypatch):
 
     assert len(calls) == 2
     assert len(outputs) == 2
-    assert calls[0][0] in {"unite_legale", "etablissement"}
-    assert calls[1][0] in {"unite_legale", "etablissement"}
+
+    logical_names = {call[0] for call in calls}
+    assert logical_names == {"unite_legale", "etablissement"}
