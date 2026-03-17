@@ -6,6 +6,7 @@ from sirene.ingest import (
     ResourceInfo,
     build_raw_filename,
     build_resource_info,
+    find_resource_by_id,
     format_size,
     parse_iso_datetime,
     process_one_resource,
@@ -200,6 +201,17 @@ def test_build_resource_info_raises_if_download_url_missing():
 
     with pytest.raises(ValueError, match="ni 'latest' ni 'url'"):
         build_resource_info("unite_legale", resource_cfg, dataset_metadata)
+
+
+def test_find_resource_by_id_raises_if_not_found():
+    dataset_metadata = {
+        "resources": [
+            {"id": "existing-id", "format": "parquet"},
+        ]
+    }
+
+    with pytest.raises(ValueError, match="Ressource introuvable"):
+        find_resource_by_id(dataset_metadata, "non-existent-id")
 
 
 def test_process_one_resource_downloads_uploads_and_loads(monkeypatch, tmp_path: Path):
