@@ -14,6 +14,7 @@ from sirene.config import (
     CHUNK_SIZE,
     DATA_GOUV_API_DATASET_URL,
     HTTP_TIMEOUT_SECONDS,
+    LOG_PROGRESS_INTERVAL_BYTES,
     RAW_DIR,
     SIRENE_RESOURCES,
 )
@@ -242,7 +243,7 @@ def download_file(resource: ResourceInfo, destination: Path) -> None:
             )
 
             downloaded_bytes = 0
-            next_log_threshold = 100 * 1024 * 1024  # 100 Mo
+            next_log_threshold = LOG_PROGRESS_INTERVAL_BYTES
             first_log = True
 
             with open(temp_path, "wb") as file_handle:
@@ -258,7 +259,9 @@ def download_file(resource: ResourceInfo, destination: Path) -> None:
                             downloaded_bytes, total_bytes, resource.logical_name
                         )
                         first_log = False
-                        next_log_threshold = downloaded_bytes + 100 * 1024 * 1024
+                        next_log_threshold = (
+                            downloaded_bytes + LOG_PROGRESS_INTERVAL_BYTES
+                        )
 
     temp_path.replace(destination)
     validate_parquet_magic_number(destination)
