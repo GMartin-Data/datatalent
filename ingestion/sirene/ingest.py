@@ -83,6 +83,19 @@ def build_resource_info(
     resource_cfg: dict[str, str],
     dataset_metadata: dict[str, Any],
 ) -> ResourceInfo:
+    """Construit un ResourceInfo à partir des métadonnées data.gouv et de la config.
+
+    Args:
+        logical_name: Identifiant logique de la ressource (ex: "unite_legale").
+        resource_cfg: Configuration de la ressource depuis SIRENE_RESOURCES.
+        dataset_metadata: Réponse JSON complète de l'API data.gouv.
+
+    Returns:
+        ResourceInfo hydraté avec les métadonnées et l'URL de téléchargement.
+
+    Raises:
+        ValueError: Si last_modified ou l'URL de téléchargement est absente.
+    """
     raw = find_resource_by_id(dataset_metadata, resource_cfg["resource_id"])
 
     resource_format = str(raw.get("format") or "").lower()
@@ -188,6 +201,19 @@ def log_download_progress(
     reraise=True,
 )
 def download_file(resource: ResourceInfo, destination: Path) -> None:
+    """Télécharge un fichier Parquet en streaming avec écriture atomique.
+
+    Écrit dans un fichier temporaire .part puis renomme en destination finale.
+    Valide le magic number Parquet après téléchargement.
+
+    Args:
+        resource: Métadonnées de la ressource à télécharger.
+        destination: Chemin local du fichier final.
+
+    Raises:
+        httpx.HTTPStatusError: Si le serveur retourne une erreur HTTP.
+        ValueError: Si le fichier téléchargé n'est pas un Parquet valide.
+    """
     temp_path = destination.with_suffix(destination.suffix + ".part")
 
     logger.info(
@@ -251,6 +277,19 @@ def process_one_resource(
     resource_cfg: dict[str, str],
     dataset_metadata: dict[str, Any],
 ) -> str:
+    """Traite une ressource Sirene : download → validate → upload GCS → load BQ.
+
+    Args:
+        logical_name: Identifiant logique (ex: "unite_legale", "etablissement").
+        resource_cfg: Configuration depuis SIRENE_RESOURCES.
+        dataset_metadata: Réponse JSON de l'API data.gouv.
+
+    Returns:
+        URI GCS du fichier uploadé.
+
+    Raises:
+        ValueError: Si le format ou le fichier téléchargé est invalide.
+    """
     resource = build_resource_info(logical_name, resource_cfg, dataset_metadata)
 
     logger.info(
@@ -299,6 +338,14 @@ def process_one_resource(
 
 
 def run() -> list[str]:
+    """Point d'entrée de l'ingestion Sirene.
+
+    Orchestre le traitement séquentiel de toutes les ressources
+    définies dans SIRENE_RESOURCES (StockEtablissement + StockUniteLegale).
+
+    Returns:
+        Liste des URIs GCS des fichiers uploadés.
+    """
     configure_logging()
     ensure_directories()
 
