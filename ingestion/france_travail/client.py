@@ -25,7 +25,7 @@ class FranceTravailClient:
     def __init__(self, client_id: str, client_secret: str):
         self._client_id = client_id
         self._client_secret = client_secret
-        self._http = httpx.Client()
+        self._http = httpx.Client(timeout=30)
         self._token_cache = {
             "access_token": None,
             "expires_at": 0,
