@@ -6,6 +6,7 @@ from sirene.ingest import (
     ResourceInfo,
     build_raw_filename,
     build_resource_info,
+    format_size,
     parse_iso_datetime,
     process_one_resource,
     run,
@@ -136,6 +137,21 @@ def test_download_file_streams_to_part_then_renames(monkeypatch, tmp_path: Path)
     assert destination.exists()
     assert not destination.with_suffix(".parquet.part").exists()
     assert destination.read_bytes() == parquet_content
+
+
+@pytest.mark.parametrize(
+    ("num_bytes", "expected"),
+    [
+        (None, "taille inconnue"),
+        (0, "0 octets"),
+        (512, "512 octets"),
+        (1024, "1.00 Ko"),
+        (1_048_576, "1.00 Mo"),
+        (2_684_354_560, "2.50 Go"),
+    ],
+)
+def test_format_size(num_bytes: int | None, expected: str):
+    assert format_size(num_bytes) == expected
 
 
 def test_build_resource_info_raises_if_last_modified_missing():
