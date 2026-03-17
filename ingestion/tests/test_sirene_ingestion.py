@@ -90,6 +90,54 @@ def test_validate_parquet_magic_number_raises_on_empty_file(tmp_path: Path):
         validate_parquet_magic_number(empty_file)
 
 
+def test_download_file_streams_to_part_then_renames(monkeypatch, tmp_path: Path):
+    """Vérifie le flux complet: streaming → .part → rename → validation magic number."""
+    resource = make_resource(
+        logical_name="unite_legale",
+        filename_prefix="StockUniteLegale",
+    )
+    destination = tmp_path / "StockUniteLegale_2026-03.parquet"
+    parquet_content = b"PAR1" + b"\x00" * 1024
+
+    class FakeResponse:
+        headers = {"Content-Length": str(len(parquet_content))}
+
+        def raise_for_status(self):
+            pass
+
+        def iter_bytes(self, chunk_size: int = 1024):
+            yield parquet_content
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+    class FakeClient:
+        def __init__(self, **kwargs):
+            pass
+
+        def stream(self, method: str, url: str):
+            return FakeResponse()
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+    monkeypatch.setattr("sirene.ingest.httpx.Client", FakeClient)
+
+    from sirene.ingest import download_file
+
+    download_file(resource, destination)
+
+    assert destination.exists()
+    assert not destination.with_suffix(".parquet.part").exists()
+    assert destination.read_bytes() == parquet_content
+
+
 def test_build_resource_info_raises_if_last_modified_missing():
     dataset_metadata = {
         "resources": [
