@@ -4,8 +4,7 @@ import time
 
 import httpx
 import tenacity
-
-from ingestion.shared.logging import get_logger
+from shared.logging import get_logger
 
 from .config import (
     API_URL,

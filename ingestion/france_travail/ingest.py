@@ -4,7 +4,8 @@ import datetime
 import json
 import os
 
-from ingestion.shared.logging import get_logger
+import httpx
+from shared.logging import get_logger
 
 from .client import FranceTravailClient
 from .config import CODES_ROME, DEPARTEMENTS, OUTPUT_DIR
@@ -37,7 +38,18 @@ def run():
         for code in CODES_ROME:
             for dept in DEPARTEMENTS:
                 logger.info("ingestion_start", code_rome=code, departement=dept)
-                offres = client.fetch_offres(code, dept)
+                try:
+                    offres = client.fetch_offres(code, dept)
+                except httpx.HTTPStatusError as e:
+                    # Erreur non retryable (ex: 400) — log et skip pour ne pas perdre
+                    # les données déjà collectées sur les autres combinaisons
+                    logger.warning(
+                        "fetch_skipped",
+                        code_rome=code,
+                        departement=dept,
+                        status_code=e.response.status_code,
+                    )
+                    continue
                 raw_offres.extend(offres)
 
         unique_offres = deduplicate_offres(raw_offres)

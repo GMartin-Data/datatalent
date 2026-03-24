@@ -19,7 +19,10 @@ DEPARTEMENTS = [
     "2A",
     "2B",
     *(f"{i:02d}" for i in range(21, 96)),
-    *(str(i) for i in range(971, 977)),
+    *(
+        str(i) for i in range(971, 975)
+    ),  # Exclut Saint-Pierre et Miquelon (collectivité, pas département)
+    "976",
 ]
 
 # --- Sortie locale ---
