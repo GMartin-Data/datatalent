@@ -10,6 +10,7 @@ from .config import (
     BATCH_SIZE,
     MAX_OFFRES,
     SCOPE,
+    SLEEP_BETWEEN_REQUESTS,
     TOKEN_URL,
 )
 
@@ -145,6 +146,7 @@ class FranceTravailClient:
             end = min(start + BATCH_SIZE - 1, MAX_OFFRES - 1)
             print(f"Batch {start}-{end} ({code_rome} / dept {departement})")
 
+            time.sleep(SLEEP_BETWEEN_REQUESTS)
             offres, total = self._fetch_batch(code_rome, departement, start, end)
             all_offres.extend(offres)
 
