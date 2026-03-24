@@ -4,7 +4,8 @@ import time
 from unittest.mock import MagicMock, patch
 
 import pytest
-from france_travail.client import FranceTravailClient
+import tenacity
+from france_travail.client import FranceTravailClient, RetryableAPIError
 
 # --- Helpers ---
 
@@ -128,7 +129,8 @@ class TestFetchOffres:
         )
 
         client = FranceTravailClient("id", "secret")
-        result = client.fetch_offres("M1805", "75")
+        with patch("france_travail.client.time.sleep"):
+            result = client.fetch_offres("M1805", "75")
 
         assert len(result) == 10
         assert mock_http.get.call_count == 1
@@ -144,7 +146,8 @@ class TestFetchOffres:
         ]
 
         client = FranceTravailClient("id", "secret")
-        result = client.fetch_offres("M1805", "75")
+        with patch("france_travail.client.time.sleep"):
+            result = client.fetch_offres("M1805", "75")
 
         assert len(result) == 200
         assert mock_http.get.call_count == 2
@@ -155,17 +158,16 @@ class TestFetchOffres:
         mock_http.get.return_value = _make_offres_response([], total=0, start=0, end=0)
 
         client = FranceTravailClient("id", "secret")
-        result = client.fetch_offres("M1805", "75")
+        with patch("france_travail.client.time.sleep"):
+            result = client.fetch_offres("M1805", "75")
 
         assert result == []
         assert mock_http.get.call_count == 1
 
 
 class TestFetchBatchRateLimit:
-    """Tests pour la gestion du rate limit (429) — backoff exponentiel."""
-
     def test_retry_sur_429(self, mock_http):
-        """Vérifie que sur un 429, le code attend et réessaie."""
+        """Vérifie qu'un 429 suivi d'un succès retourne les offres."""
         mock_http.post.return_value = _make_token_response()
         mock_http.get.side_effect = [
             _make_error_response(429),
@@ -173,21 +175,29 @@ class TestFetchBatchRateLimit:
         ]
 
         client = FranceTravailClient("id", "secret")
-        with patch("france_travail.client.time.sleep") as mock_sleep:
+        # Désactive le wait tenacity + le throttle pour le test
+        client._request.retry.wait = tenacity.wait_none()  # type: ignore[attr-defined]
+        with patch("france_travail.client.time.sleep"):
             result = client.fetch_offres("M1805", "75")
-            mock_sleep.assert_called_once_with(1)  # BACKOFF_BASE ** 0 = 1
 
         assert len(result) == 1
+        assert result[0]["id"] == "1"
+        # 2 appels GET : le 429 + le succès
+        assert mock_http.get.call_count == 2
 
     def test_echoue_apres_max_retries(self, mock_http):
-        """Vérifie qu'une RuntimeError est levée si le 429 persiste."""
+        """Vérifie que RetryableAPIError est levée si le 429 persiste."""
         mock_http.post.return_value = _make_token_response()
         mock_http.get.return_value = _make_error_response(429)
 
         client = FranceTravailClient("id", "secret")
+        client._request.retry.wait = tenacity.wait_none()  # type: ignore[attr-defined]
         with patch("france_travail.client.time.sleep"):
-            with pytest.raises(RuntimeError, match="Échec après"):
+            with pytest.raises(RetryableAPIError):
                 client.fetch_offres("M1805", "75")
+
+        # 5 tentatives (stop_after_attempt(5))
+        assert mock_http.get.call_count == 5
 
 
 class TestFetchBatchTokenExpire:
@@ -202,7 +212,8 @@ class TestFetchBatchTokenExpire:
         ]
 
         client = FranceTravailClient("id", "secret")
-        result = client.fetch_offres("M1805", "75")
+        with patch("france_travail.client.time.sleep"):
+            result = client.fetch_offres("M1805", "75")
 
         # Le token a été invalidé puis re-demandé : 2 appels POST au total
         assert mock_http.post.call_count == 2

@@ -3,7 +3,6 @@
 import datetime
 import json
 import os
-from pathlib import Path
 
 from ingestion.shared.logging import get_logger
 
@@ -13,34 +12,42 @@ from .config import CODES_ROME, DEPARTEMENTS, OUTPUT_DIR
 logger = get_logger(__name__)
 
 
-def run():
-    output_dir = Path(OUTPUT_DIR)
-    output_dir.mkdir(parents=True, exist_ok=True)
+def deduplicate_offres(offres: list[dict]) -> list[dict]:
+    """Déduplique les offres par id (last-wins)."""
+    seen = {}
+    for offre in offres:
+        seen[offre["id"]] = offre
+    return list(seen.values())
 
+
+def write_jsonl(offres: list[dict], file_path: str) -> None:
+    """Écrit les offres au format JSONL (une ligne JSON par offre)."""
+    with open(file_path, "w", encoding="utf-8") as f:
+        for offre in offres:
+            f.write(json.dumps(offre, ensure_ascii=False) + "\n")
+
+
+def run():
     with FranceTravailClient(
         client_id=os.environ["CLIENT_ID"],
         client_secret=os.environ["CLIENT_SECRET"],
     ) as client:
-        all_offres = {}
+        raw_offres = []
 
         for code in CODES_ROME:
             for dept in DEPARTEMENTS:
                 logger.info("ingestion_start", code_rome=code, departement=dept)
                 offres = client.fetch_offres(code, dept)
+                raw_offres.extend(offres)
 
-                for offre in offres:
-                    all_offres[offre["id"]] = offre
-
-        logger.info("dedup_complete", total=len(all_offres))
+        unique_offres = deduplicate_offres(raw_offres)
+        logger.info("dedup_complete", raw=len(raw_offres), unique=len(unique_offres))
 
         filename = f"france_travail_{datetime.date.today().isoformat()}.jsonl"
         file_path = os.path.join(OUTPUT_DIR, filename)
 
-        with open(file_path, "w", encoding="utf-8") as f:
-            for offre in all_offres.values():
-                f.write(json.dumps(offre, ensure_ascii=False) + "\n")
-
-        logger.info("file_written", path=file_path, count=len(all_offres))
+        write_jsonl(unique_offres, file_path)
+        logger.info("file_written", path=file_path, count=len(unique_offres))
 
 
 if __name__ == "__main__":
