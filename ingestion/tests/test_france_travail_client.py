@@ -164,8 +164,40 @@ class TestFetchOffres:
         assert result == []
         assert mock_http.get.call_count == 1
 
+    def test_204_retourne_liste_vide(self, mock_http):
+        """Vérifie que le 204 No Content retourne une liste vide sans crash."""
+        mock_http.post.return_value = _make_token_response()
+        mock_204 = MagicMock()
+        mock_204.status_code = 204
+        mock_http.get.return_value = mock_204
 
-class TestFetchBatchRateLimit:
+        client = FranceTravailClient("id", "secret")
+        with patch("france_travail.client.time.sleep"):
+            result = client.fetch_offres("M1805", "75")
+
+        assert result == []
+        assert mock_http.get.call_count == 1
+
+    def test_sleep_entre_requetes(self, mock_http):
+        """Vérifie que le throttle est appliqué entre chaque batch."""
+        mock_http.post.return_value = _make_token_response()
+        batch1 = [{"id": str(i)} for i in range(150)]
+        batch2 = [{"id": str(i)} for i in range(50)]
+        mock_http.get.side_effect = [
+            _make_offres_response(batch1, total=200, start=0, end=149),
+            _make_offres_response(batch2, total=200, start=150, end=199),
+        ]
+
+        client = FranceTravailClient("id", "secret")
+        with patch("france_travail.client.time.sleep") as mock_sleep:
+            client.fetch_offres("M1805", "75")
+
+        # 2 batchs = 2 appels sleep(0.15)
+        assert mock_sleep.call_count == 2
+        mock_sleep.assert_called_with(0.15)
+
+
+class TestFetchBatchRetry:
     def test_retry_sur_429(self, mock_http):
         """Vérifie qu'un 429 suivi d'un succès retourne les offres."""
         mock_http.post.return_value = _make_token_response()
@@ -183,6 +215,38 @@ class TestFetchBatchRateLimit:
         assert len(result) == 1
         assert result[0]["id"] == "1"
         # 2 appels GET : le 429 + le succès
+        assert mock_http.get.call_count == 2
+
+    def test_retry_sur_500(self, mock_http):
+        """Vérifie qu'un 500 suivi d'un succès retourne les offres."""
+        mock_http.post.return_value = _make_token_response()
+        mock_http.get.side_effect = [
+            _make_error_response(500),
+            _make_offres_response([{"id": "1"}], total=1, start=0, end=0),
+        ]
+
+        client = FranceTravailClient("id", "secret")
+        client._request.retry.wait = tenacity.wait_none()  # type: ignore[attr-defined]
+        with patch("france_travail.client.time.sleep"):
+            result = client.fetch_offres("M1805", "75")
+
+        assert len(result) == 1
+        assert mock_http.get.call_count == 2
+
+    def test_retry_sur_503(self, mock_http):
+        """Vérifie qu'un 503 suivi d'un succès retourne les offres."""
+        mock_http.post.return_value = _make_token_response()
+        mock_http.get.side_effect = [
+            _make_error_response(503),
+            _make_offres_response([{"id": "1"}], total=1, start=0, end=0),
+        ]
+
+        client = FranceTravailClient("id", "secret")
+        client._request.retry.wait = tenacity.wait_none()  # type: ignore[attr-defined]
+        with patch("france_travail.client.time.sleep"):
+            result = client.fetch_offres("M1805", "75")
+
+        assert len(result) == 1
         assert mock_http.get.call_count == 2
 
     def test_echoue_apres_max_retries(self, mock_http):
