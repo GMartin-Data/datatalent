@@ -10,10 +10,6 @@ BATCH_SIZE = 150
 MAX_OFFRES = 1_150
 SLEEP_BETWEEN_REQUESTS = 0.15  # Rate limit 10/s
 
-# --- Retry (supprimés ultérieurement - migration tenacity)
-MAX_RETRIES = 5
-BACKOFF_BASE = 2
-
 # --- Codes ROME (D8) ---
 CODES_ROME = ["M1805", "M1810", "M1806", "M1801"]
 

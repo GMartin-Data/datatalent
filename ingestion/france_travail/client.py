@@ -3,16 +3,23 @@
 import time
 
 import httpx
+import tenacity
 
 from .config import (
     API_URL,
-    BACKOFF_BASE,
     BATCH_SIZE,
     MAX_OFFRES,
-    MAX_RETRIES,
     SCOPE,
     TOKEN_URL,
 )
+
+
+class RetryableAPIError(Exception):
+    """Erreur API retryable (429, 500, 503)."""
+
+    def __init__(self, status_code: int, message: str):
+        self.status_code = status_code
+        super().__init__(message)
 
 
 class FranceTravailClient:
@@ -71,49 +78,55 @@ class FranceTravailClient:
 
     # --- Fetch (public) ---
 
+    @tenacity.retry(
+        retry=tenacity.retry_if_exception_type(RetryableAPIError),
+        wait=tenacity.wait_exponential(multiplier=1, min=1, max=30)
+        + tenacity.wait_random(0, 1),
+        stop=tenacity.stop_after_attempt(5),
+        reraise=True,
+    )
+    def _request(
+        self, code_rome: str, departement: str, start: int, end: int
+    ) -> httpx.Response:
+        """Exécute un appel HTTP unique. Lève RetryableAPIError sur 429/500/503."""
+        token = self._get_token()
+        response = self._http.get(
+            API_URL,
+            headers={"Authorization": f"Bearer {token}"},
+            params={
+                "codeROME": code_rome,
+                "departement": departement,
+                "range": f"{start}-{end}",
+            },
+        )
+
+        if response.status_code in (429, 500, 503):
+            raise RetryableAPIError(
+                response.status_code,
+                f"HTTP {response.status_code} pour {code_rome}/dept {departement}",
+            )
+
+        return response
+
     def _fetch_batch(
         self, code_rome: str, departement: str, start: int, end: int
     ) -> tuple[list, int]:
         """Récupère un batch d'offres (une page de résultats)."""
-        for attempt in range(MAX_RETRIES):
-            try:
-                token = self._get_token()
-                headers = {"Authorization": f"Bearer {token}"}
-                params = {
-                    "codeROME": code_rome,
-                    "departement": departement,
-                    "range": f"{start}-{end}",
-                }
+        response = self._request(code_rome, departement, start, end)
 
-                response = self._http.get(API_URL, headers=headers, params=params)
+        if response.status_code == 401:
+            self._invalidate_token()
+            response = self._request(code_rome, departement, start, end)
 
-                if response.status_code == 429:
-                    wait = BACKOFF_BASE**attempt
-                    print(
-                        f"Rate limit (429), attente {wait}s "
-                        f"(tentative {attempt + 1}/{MAX_RETRIES})"
-                    )
-                    time.sleep(wait)
-                    continue
+        if response.status_code == 204:
+            return [], 0
 
-                if response.status_code == 401 and attempt == 0:
-                    print("Token invalide (401), renouvellement forcé...")
-                    self._invalidate_token()
-                    continue
+        response.raise_for_status()  # Crashe proprement sur les autres erreurs
+        data = response.json()
 
-                response.raise_for_status()
-                data = response.json()
-
-                total = self._parse_total(response.headers.get("Content-Range", ""))
-                offres = data.get("resultats", [])
-                return offres, total
-
-            except httpx.HTTPError:
-                raise
-
-        raise RuntimeError(
-            f"Échec après {MAX_RETRIES} tentatives ({code_rome}, dept {departement})"
-        )
+        total = self._parse_total(response.headers.get("Content-Range", ""))
+        offres = data.get("resultats", [])
+        return offres, total
 
     @staticmethod
     def _parse_total(content_range: str) -> int:
