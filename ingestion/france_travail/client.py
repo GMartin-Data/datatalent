@@ -5,6 +5,8 @@ import time
 import httpx
 import tenacity
 
+from ingestion.shared.logging import get_logger
+
 from .config import (
     API_URL,
     BATCH_SIZE,
@@ -13,6 +15,8 @@ from .config import (
     SLEEP_BETWEEN_REQUESTS,
     TOKEN_URL,
 )
+
+logger = get_logger(__name__)
 
 
 class RetryableAPIError(Exception):
@@ -68,9 +72,7 @@ class FranceTravailClient:
         self._token_cache["access_token"] = token_info["access_token"]
         self._token_cache["expires_at"] = now + token_info.get("expires_in", 1500)
 
-        print(
-            f"Nouveau token obtenu, expire dans {token_info.get('expires_in', 1500)}s"
-        )
+        logger.info("token_obtained", expires_in=token_info.get("expires_in", 1500))
         return self._token_cache["access_token"]
 
     def _invalidate_token(self):
@@ -144,20 +146,30 @@ class FranceTravailClient:
 
         while start < MAX_OFFRES:
             end = min(start + BATCH_SIZE - 1, MAX_OFFRES - 1)
-            print(f"Batch {start}-{end} ({code_rome} / dept {departement})")
+            logger.debug(
+                "fetch_batch",
+                range=f"{start}-{end}",
+                code_rome=code_rome,
+                departement=departement,
+            )
 
             time.sleep(SLEEP_BETWEEN_REQUESTS)
             offres, total = self._fetch_batch(code_rome, departement, start, end)
             all_offres.extend(offres)
 
-            print(f"{len(offres)} offres récupérées (total annoncé : {total})")
+            logger.debug("batch_result", count=len(offres), total=total)
 
             if not offres or start + BATCH_SIZE >= total:
                 break
 
             start += BATCH_SIZE
 
-        print(f"{len(all_offres)} offres au total ({code_rome} / dept {departement})")
+        logger.info(
+            "fetch_complete",
+            count=len(all_offres),
+            code_rome=code_rome,
+            departement=departement,
+        )
         return all_offres
 
     # --- Cleanup ---

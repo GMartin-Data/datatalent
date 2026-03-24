@@ -4,8 +4,12 @@ import json
 import os
 from pathlib import Path
 
+from ingestion.shared import get_logger
+
 from .client import FranceTravailClient
 from .config import CODES_ROME, DEPARTEMENTS, OUTPUT_DIR
+
+logger = get_logger(__name__)
 
 
 def run():
@@ -18,14 +22,14 @@ def run():
     ) as client:
         for code in CODES_ROME:
             for dept in DEPARTEMENTS:
-                print(f"Ingestion {code} — département {dept}")
+                logger.info("ingestion_start", code_rome=code, departement=dept)
                 offres = client.fetch_offres(code, dept)
 
                 file_path = output_dir / f"offres_{code}_{dept}.json"
                 with open(file_path, "w", encoding="utf-8") as f:
                     json.dump(offres, f, ensure_ascii=False, indent=2)
 
-                print(f"Stocké : {file_path} ({len(offres)} offres)")
+                logger.info("file_written", path=str(file_path), count=len(offres))
 
 
 if __name__ == "__main__":
