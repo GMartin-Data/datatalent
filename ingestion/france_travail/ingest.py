@@ -5,19 +5,19 @@ import os
 from pathlib import Path
 
 from .client import FranceTravailClient
-from .config import RAW_DATA_DIR, codes_rome, departements
+from .config import CODES_ROME, DEPARTEMENTS, OUTPUT_DIR
 
 
 def run():
-    output_dir = Path(RAW_DATA_DIR)
+    output_dir = Path(OUTPUT_DIR)
     output_dir.mkdir(parents=True, exist_ok=True)
 
     with FranceTravailClient(
         client_id=os.environ["CLIENT_ID"],
         client_secret=os.environ["CLIENT_SECRET"],
     ) as client:
-        for code in codes_rome:
-            for dept in departements:
+        for code in CODES_ROME:
+            for dept in DEPARTEMENTS:
                 print(f"Ingestion {code} — département {dept}")
                 offres = client.fetch_offres(code, dept)
 
