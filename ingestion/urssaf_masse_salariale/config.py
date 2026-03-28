@@ -4,7 +4,7 @@ BASE_URL = (
     "/records"
 )
 
-WHERE_FILTER = "na88 LIKE '62%'"
+WHERE_FILTER = 'secteur_na88i LIKE "62%"'
 ORDER_BY = "annee ASC"
 PAGE_LIMIT = 100
 
@@ -14,7 +14,7 @@ FIELD_MAP = {
     "annee": "annee",
     "nombre_d_etablissements": "nb_etablissements",
     "effectifs_salaries_moyens": "effectifs_salaries_moyens",
-    "masse_salariale_brute": "masse_salariale_brute",
+    "masse_salariale": "masse_salariale_brute",
 }
 
 GCS_PREFIX = "urssaf_masse_salariale"
