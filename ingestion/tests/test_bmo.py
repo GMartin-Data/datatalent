@@ -1,10 +1,9 @@
 """Tests pour ingestion/bmo/parse_xlsx.py."""
 
 import pytest
+from bmo.config import BMO_SHEET_NAME, COLUMN_MAPPING
+from bmo.parse_xlsx import parse_bmo_xlsx
 from openpyxl import Workbook
-
-from ingestion.bmo.config import BMO_SHEET_NAME, COLUMN_MAPPING
-from ingestion.bmo.parse_xlsx import parse_bmo_xlsx
 
 # En-têtes source dans l'ordre du COLUMN_MAPPING
 SOURCE_HEADERS = list(COLUMN_MAPPING.keys())

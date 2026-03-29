@@ -2,14 +2,13 @@
 
 from pathlib import Path
 
-from openpyxl import load_workbook
-
-from ingestion.bmo.config import (
+from bmo.config import (
     BMO_SHEET_NAME,
     CODES_METIER_IT,
     COLUMN_MAPPING,
     NUMERIC_COLUMNS,
 )
+from openpyxl import load_workbook
 
 
 def _build_header_index(header_row: tuple) -> dict[str, int]:
