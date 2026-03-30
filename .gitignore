@@ -24,3 +24,7 @@ infra/.terraform.lock.hcl
 
 # OS
 .DS_Store
+
+#Quentin    
+dataexplo.ipynb
+ingestion/sirene/data/
