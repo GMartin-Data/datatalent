@@ -75,6 +75,25 @@ def test_unpivot_filters_null_years():
     assert 2023 in annees
 
 
+def test_unpivot_preserves_partial_null():
+    """
+    Une année avec une seule colonne non-null doit être conservée avec l'autre à null.
+    """
+    record = {
+        "code_commune": "94065",
+        "intitule_commune": "94065 Rungis",
+        "code_departement": "94",
+        "code_ape": "6203Z",
+        "effectifs_salaries_2010": 5,
+        "nombre_d_etablissements_2010": None,
+    }
+    result = _unpivot([record])
+
+    assert len(result) == 1
+    assert result[0]["effectifs_salaries"] == 5
+    assert result[0]["nb_etablissements"] is None
+
+
 @patch("urssaf_effectifs.ingest.load_gcs_to_bq")
 @patch("urssaf_effectifs.ingest.upload_to_gcs")
 @patch("urssaf_effectifs.ingest.fetch_records")

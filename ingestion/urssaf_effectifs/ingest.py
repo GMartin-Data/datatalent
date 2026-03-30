@@ -45,8 +45,8 @@ def _unpivot(records: list[dict]) -> list[dict]:
                 {
                     **dimensions,
                     "annee": year,
-                    "effectifs_salaries": effectifs or 0,
-                    "nb_etablissements": nb_etab or 0,
+                    "effectifs_salaries": effectifs,
+                    "nb_etablissements": nb_etab,
                 }
             )
 
