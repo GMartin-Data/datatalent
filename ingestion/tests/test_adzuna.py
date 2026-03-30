@@ -1,10 +1,12 @@
-"""Tests pour ingestion.adzuna.client."""
+"""Tests pour adzuna.client et adzuna.ingest."""
 
+import json
 from unittest.mock import MagicMock, patch
 
 import httpx
 import pytest
 from adzuna.client import fetch_all_offers
+from adzuna.ingest import _extract_value, _map_offer, run
 
 
 def _mock_response(status_code: int = 200, json_data: dict | None = None) -> MagicMock:
@@ -25,8 +27,8 @@ def _mock_response(status_code: int = 200, json_data: dict | None = None) -> Mag
 class TestFetchPage:
     """Tests pour _fetch_page via fetch_all_offers."""
 
-    @patch("ingestion.adzuna.client.SLEEP_BETWEEN_REQUESTS", 0)
-    @patch("ingestion.adzuna.client.httpx.Client")
+    @patch("adzuna.client.SLEEP_BETWEEN_REQUESTS", 0)
+    @patch("adzuna.client.httpx.Client")
     def test_pagination_two_pages(self, mock_client_cls):
         """Deux pages : la première pleine (50), la seconde partielle (10) → arrêt."""
         page1 = _mock_response(
@@ -53,8 +55,8 @@ class TestFetchPage:
         assert len(offers) == 60
         assert mock_client.get.call_count == 2
 
-    @patch("ingestion.adzuna.client.SLEEP_BETWEEN_REQUESTS", 0)
-    @patch("ingestion.adzuna.client.httpx.Client")
+    @patch("adzuna.client.SLEEP_BETWEEN_REQUESTS", 0)
+    @patch("adzuna.client.httpx.Client")
     def test_single_page(self, mock_client_cls):
         """Moins de 50 résultats → une seule page, pas de sleep."""
         page1 = _mock_response(
@@ -79,8 +81,8 @@ class TestFetchPage:
 class TestRetry:
     """Tests pour le mécanisme de retry."""
 
-    @patch("ingestion.adzuna.client.SLEEP_BETWEEN_REQUESTS", 0)
-    @patch("ingestion.adzuna.client.httpx.Client")
+    @patch("adzuna.client.SLEEP_BETWEEN_REQUESTS", 0)
+    @patch("adzuna.client.httpx.Client")
     def test_retry_then_success(self, mock_client_cls):
         """429 au premier appel, succès au deuxième → retry transparent."""
         response_429 = _mock_response(status_code=429)
@@ -102,8 +104,8 @@ class TestRetry:
         assert len(offers) == 1
         assert mock_client.get.call_count == 2
 
-    @patch("ingestion.adzuna.client.SLEEP_BETWEEN_REQUESTS", 0)
-    @patch("ingestion.adzuna.client.httpx.Client")
+    @patch("adzuna.client.SLEEP_BETWEEN_REQUESTS", 0)
+    @patch("adzuna.client.httpx.Client")
     def test_fatal_error_no_retry(self, mock_client_cls):
         """400 Bad Request → HTTPStatusError immédiate, pas de retry."""
         response_400 = _mock_response(status_code=400)
@@ -118,3 +120,179 @@ class TestRetry:
             fetch_all_offers("fake_id", "fake_key")
 
         assert mock_client.get.call_count == 1
+
+
+class TestExtractValue:
+    """Tests pour _extract_value."""
+
+    def test_flat_key(self):
+        """Clé simple, premier niveau."""
+        assert _extract_value({"id": "123"}, "id") == "123"
+
+    def test_nested_key(self):
+        """Clé imbriquée via notation pointée."""
+        offer = {"company": {"display_name": "Acme"}}
+        assert _extract_value(offer, "company.display_name") == "Acme"
+
+    def test_missing_intermediate(self):
+        """Niveau intermédiaire absent → None."""
+        assert _extract_value({}, "company.display_name") is None
+
+    def test_missing_leaf(self):
+        """Niveau final absent → None."""
+        offer = {"company": {}}
+        assert _extract_value(offer, "company.display_name") is None
+
+    def test_intermediate_not_dict(self):
+        """Niveau intermédiaire n'est pas un dict → None."""
+        offer = {"company": "string_value"}
+        assert _extract_value(offer, "company.display_name") is None
+
+    def test_array_value(self):
+        """Valeur de type array retournée telle quelle."""
+        offer = {"location": {"area": ["France", "Île-de-France", "Paris"]}}
+        assert _extract_value(offer, "location.area") == [
+            "France",
+            "Île-de-France",
+            "Paris",
+        ]
+
+
+class TestMapOffer:
+    """Tests pour _map_offer."""
+
+    def test_full_offer(self):
+        """Offre complète — tous les champs mappés."""
+        offer = {
+            "id": "42",
+            "title": "Data Engineer",
+            "company": {"display_name": "Acme"},
+            "location": {
+                "display_name": "Paris",
+                "area": ["France", "Île-de-France"],
+            },
+            "latitude": 48.85,
+            "longitude": 2.35,
+            "salary_min": 45000,
+            "salary_max": 55000,
+            "salary_is_predicted": "0",
+            "description": "Poste data engineer...",
+            "redirect_url": "https://adzuna.fr/land/ad/123",
+            "category": {"tag": "it-jobs", "label": "IT Jobs"},
+            "contract_type": "permanent",
+            "contract_time": "full_time",
+            "created": "2026-03-20T07:53:25Z",
+        }
+        mapped = _map_offer(offer)
+
+        assert mapped["offre_id"] == "42"
+        assert mapped["titre"] == "Data Engineer"
+        assert mapped["entreprise_nom"] == "Acme"
+        assert mapped["localisation_libelle"] == "Paris"
+        assert mapped["localisation_area"] == ["France", "Île-de-France"]
+        assert mapped["latitude"] == 48.85
+        assert mapped["salaire_min"] == 45000
+        assert mapped["salaire_est_estime"] == "0"
+        assert mapped["categorie_tag"] == "it-jobs"
+        assert mapped["type_contrat"] == "permanent"
+        assert mapped["date_creation"] == "2026-03-20T07:53:25Z"
+
+    def test_sparse_offer(self):
+        """Offre minimale — champs absents mappés à None."""
+        offer = {
+            "id": "99",
+            "title": "Data Engineer Junior",
+            "created": "2026-03-25T10:00:00Z",
+        }
+        mapped = _map_offer(offer)
+
+        assert mapped["offre_id"] == "99"
+        assert mapped["titre"] == "Data Engineer Junior"
+        assert mapped["entreprise_nom"] is None
+        assert mapped["salaire_min"] is None
+        assert mapped["latitude"] is None
+        assert mapped["categorie_tag"] is None
+
+    def test_excluded_fields(self):
+        """Les champs __CLASS__ et adref ne sont pas dans le résultat."""
+        offer = {
+            "id": "1",
+            "title": "DE",
+            "__CLASS__": "Adzuna::API::Response::Job",
+            "adref": "abc123",
+            "created": "2026-03-25T10:00:00Z",
+        }
+        mapped = _map_offer(offer)
+
+        assert "__CLASS__" not in mapped
+        assert "adref" not in mapped
+        assert "__class__" not in mapped.values()
+        assert "abc123" not in mapped.values()
+
+
+class TestRun:
+    """Tests d'intégration pour run()."""
+
+    @patch("adzuna.ingest.load_gcs_to_bq")
+    @patch(
+        "adzuna.ingest.upload_to_gcs",
+        return_value="gs://datatalent-raw/adzuna/2026-03-30/adzuna.jsonl",
+    )
+    @patch("adzuna.ingest.fetch_all_offers")
+    @patch("adzuna.ingest.get_credentials", return_value=("fake_id", "fake_key"))
+    def test_run_happy_path(self, _mock_creds, mock_fetch, mock_gcs, mock_bq, tmp_path):
+        """Run complet : credentials → fetch → JSONL → GCS → BQ."""
+        mock_fetch.return_value = [
+            {
+                "id": "1",
+                "title": "Data Engineer",
+                "company": {"display_name": "Acme"},
+                "location": {"display_name": "Paris", "area": ["France"]},
+                "latitude": 48.85,
+                "longitude": 2.35,
+                "description": "Poste DE",
+                "redirect_url": "https://adzuna.fr/land/ad/1",
+                "category": {"tag": "it-jobs", "label": "IT Jobs"},
+                "created": "2026-03-20T07:53:25Z",
+            },
+        ]
+
+        jsonl_path = str(tmp_path / "adzuna.jsonl")
+        with patch("adzuna.ingest.LOCAL_JSONL_PATH", jsonl_path):
+            run()
+
+        # Vérification JSONL écrit
+        with open(jsonl_path, encoding="utf-8") as f:
+            lines = f.readlines()
+        assert len(lines) == 1
+        record = json.loads(lines[0])
+        assert record["offre_id"] == "1"
+        assert record["entreprise_nom"] == "Acme"
+        assert record["salaire_min"] is None
+
+        # Vérification appels shared/
+        mock_gcs.assert_called_once_with(jsonl_path, "adzuna")
+        mock_bq.assert_called_once_with(
+            "gs://datatalent-raw/adzuna/2026-03-30/adzuna.jsonl",
+            "raw",
+            "adzuna",
+        )
+
+    @patch("adzuna.ingest.load_gcs_to_bq")
+    @patch("adzuna.ingest.upload_to_gcs", return_value="gs://fake")
+    @patch("adzuna.ingest.fetch_all_offers", return_value=[])
+    @patch("adzuna.ingest.get_credentials", return_value=("fake_id", "fake_key"))
+    def test_run_empty_results(
+        self, _mock_creds, _mock_fetch, mock_gcs, mock_bq, tmp_path
+    ):
+        """Aucune offre → JSONL vide, GCS et BQ appelés quand même."""
+        jsonl_path = str(tmp_path / "adzuna.jsonl")
+        with patch("adzuna.ingest.LOCAL_JSONL_PATH", jsonl_path):
+            run()
+
+        with open(jsonl_path, encoding="utf-8") as f:
+            lines = f.readlines()
+        assert len(lines) == 0
+
+        mock_gcs.assert_called_once()
+        mock_bq.assert_called_once()
