@@ -8,15 +8,17 @@ from typing import Any
 
 import httpx
 from shared.bigquery import load_gcs_to_bq
-from shared.gcs import upload_to_gcs
+from shared.gcs import get_most_recent_blob_date, upload_to_gcs
 from shared.logging import get_logger
 from sirene.config import (
     CHUNK_SIZE,
     DATA_GOUV_API_DATASET_URL,
+    GCS_PREFIX,
     HTTP_TIMEOUT_SECONDS,
     LOG_PROGRESS_INTERVAL_BYTES,
     RAW_DIR,
     SIRENE_RESOURCES,
+    SKIP_IF_RECENT_DAYS,
 )
 from tenacity import retry, stop_after_attempt, wait_exponential
 
@@ -322,7 +324,7 @@ def process_one_resource(
         size=format_size(raw_path.stat().st_size),
     )
 
-    gcs_uri = upload_to_gcs(str(raw_path), "sirene")
+    gcs_uri = upload_to_gcs(str(raw_path), GCS_PREFIX)
     logger.info(
         "resource_uploaded_to_gcs",
         logical_name=resource.logical_name,
@@ -340,19 +342,45 @@ def process_one_resource(
     return gcs_uri
 
 
+def _most_recent_blob_age_days() -> int | None:
+    """Retourne l'âge en jours du blob le plus récent sous le prefix Sirene.
+
+    Returns:
+        Nombre de jours depuis la dernière mise à jour, ou None si aucun blob.
+    """
+    updated = get_most_recent_blob_date(GCS_PREFIX)
+    if updated is None:
+        return None
+    age = datetime.now(UTC) - updated
+    return age.days
+
+
 def run() -> list[str]:
     """Point d'entrée de l'ingestion Sirene.
 
-    Orchestre le traitement séquentiel de toutes les ressources
-    définies dans SIRENE_RESOURCES (StockEtablissement + StockUniteLegale).
+    Vérifie d'abord si un fichier récent existe dans GCS (D40).
+    Si oui, skip l'ingestion. Sinon, traitement séquentiel normal.
 
     Returns:
-        Liste des URIs GCS des fichiers uploadés.
+        Liste des URIs GCS des fichiers uploadés (vide si skip).
     """
     configure_logging()
     ensure_directories()
 
-    logger.info("sirene_ingestion_started")
+    logger.info("sirene.ingestion_started")
+
+    try:
+        age_days = _most_recent_blob_age_days()
+        if age_days is not None and age_days < SKIP_IF_RECENT_DAYS:
+            logger.info(
+                "sirene.skip_recent",
+                age_days=age_days,
+                threshold_days=SKIP_IF_RECENT_DAYS,
+            )
+            return []
+    except Exception:
+        logger.warning("sirene.skip_check_failed", exc_info=True)
+
     dataset_metadata = fetch_dataset_metadata()
 
     outputs: list[str] = []
@@ -361,7 +389,7 @@ def run() -> list[str]:
             process_one_resource(logical_name, resource_cfg, dataset_metadata)
         )
 
-    logger.info("sirene_ingestion_succeeded", resource_count=len(outputs))
+    logger.info("sirene.ingestion_succeeded", resource_count=len(outputs))
     return outputs
 
 
@@ -369,5 +397,5 @@ if __name__ == "__main__":
     try:
         run()
     except Exception as exc:
-        logger.exception("sirene_ingestion_failed", error=str(exc))
+        logger.exception("sirene.ingestion_failed", error=str(exc))
         sys.exit(1)

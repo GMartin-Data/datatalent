@@ -1,5 +1,6 @@
 from datetime import UTC, datetime
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 from sirene.ingest import (
@@ -296,3 +297,43 @@ def test_run_calls_process_for_each_resource(monkeypatch):
 
     logical_names = {call[0] for call in calls}
     assert logical_names == {"unite_legale", "etablissement"}
+
+
+class TestSireneSkipConditionnel:
+    """Tests du skip conditionnel D40 — fichier GCS < 30 jours."""
+
+    @patch("sirene.ingest.process_one_resource")
+    @patch("sirene.ingest.fetch_dataset_metadata")
+    @patch("sirene.ingest._most_recent_blob_age_days", return_value=15)
+    def test_skip_when_recent_file_exists(self, mock_age, mock_metadata, mock_process):
+        outputs = run()
+
+        assert outputs == []
+        mock_age.assert_called_once()
+        mock_metadata.assert_not_called()
+        mock_process.assert_not_called()
+
+    @patch("sirene.ingest.process_one_resource")
+    @patch("sirene.ingest.fetch_dataset_metadata", return_value={"resources": []})
+    @patch("sirene.ingest._most_recent_blob_age_days", return_value=45)
+    def test_proceeds_when_file_is_old(self, mock_age, mock_metadata, mock_process):
+        mock_process.return_value = "gs://datatalent-raw/sirene/test.parquet"
+
+        outputs = run()
+
+        assert len(outputs) == 2
+        mock_metadata.assert_called_once()
+
+    @patch("sirene.ingest.process_one_resource")
+    @patch("sirene.ingest.fetch_dataset_metadata", return_value={"resources": []})
+    @patch(
+        "sirene.ingest._most_recent_blob_age_days",
+        side_effect=Exception("GCS unavailable"),
+    )
+    def test_proceeds_when_gcs_check_fails(self, mock_age, mock_metadata, mock_process):
+        mock_process.return_value = "gs://datatalent-raw/sirene/test.parquet"
+
+        outputs = run()
+
+        assert len(outputs) == 2
+        mock_metadata.assert_called_once()

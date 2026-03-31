@@ -28,3 +28,7 @@ SIRENE_RESOURCES = {
         "bq_table": "sirene_etablissement",
     },
 }
+
+# --- GCS ---
+GCS_PREFIX = "sirene"
+SKIP_IF_RECENT_DAYS = 30

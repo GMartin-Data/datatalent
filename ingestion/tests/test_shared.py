@@ -8,7 +8,7 @@ import structlog.testing
 from google.cloud import bigquery
 from main import main
 from shared.bigquery import _infer_source_format, load_gcs_to_bq
-from shared.gcs import upload_to_gcs
+from shared.gcs import get_most_recent_blob_date, upload_to_gcs
 from shared.logging import get_logger
 
 
@@ -59,7 +59,7 @@ class TestUploadToGcs:
 
         uri = upload_to_gcs(str(test_file), "france_travail")
 
-        assert uri.startswith("gs://datatalent-raw/france_travail/")
+        assert uri.startswith("gs://datatalent-glaq-2-raw/france_travail/")
         assert uri.endswith("/offres.json")
 
     @patch("shared.gcs.storage.Client")
@@ -144,6 +144,39 @@ class TestLoadGcsToBq:
         assert "_ingestion_date" in queries[0]
         assert "UPDATE" in queries[1]
         assert "CURRENT_DATE()" in queries[1]
+
+
+class TestGetMostRecentBlobDate:
+    """Tests for get_most_recent_blob_date()."""
+
+    @patch("shared.gcs.storage.Client")
+    def test_returns_none_when_no_blobs(self, mock_client_cls: MagicMock) -> None:
+        mock_client_cls.return_value.list_blobs.return_value = []
+
+        result = get_most_recent_blob_date("sirene")
+
+        assert result is None
+        mock_client_cls.return_value.list_blobs.assert_called_once_with(
+            "datatalent-glaq-2-raw", prefix="sirene/"
+        )
+
+    @patch("shared.gcs.storage.Client")
+    def test_returns_most_recent_date(self, mock_client_cls: MagicMock) -> None:
+        from datetime import UTC, datetime
+
+        old_blob = MagicMock()
+        old_blob.updated = datetime(2026, 2, 1, tzinfo=UTC)
+        old_blob.name = "sirene/2026-02-01/stock.parquet"
+
+        recent_blob = MagicMock()
+        recent_blob.updated = datetime(2026, 3, 15, tzinfo=UTC)
+        recent_blob.name = "sirene/2026-03-15/stock.parquet"
+
+        mock_client_cls.return_value.list_blobs.return_value = [old_blob, recent_blob]
+
+        result = get_most_recent_blob_date("sirene")
+
+        assert result == datetime(2026, 3, 15, tzinfo=UTC)
 
 
 class TestMain:
