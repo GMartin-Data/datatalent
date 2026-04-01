@@ -1,0 +1,6 @@
+# dbt/pyproject.toml
+[project]
+name = "datatalent-dbt"
+version = "1.0.0"
+requires-python = ">=3.12"
+dependencies = ["dbt-bigquery>=1.11.0,<2.0.0"]
