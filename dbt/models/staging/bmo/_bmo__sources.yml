@@ -1,0 +1,9 @@
+version: 2
+
+sources:
+  - name: bmo
+    database: "{{ env_var('DBT_PROJECT_ID', 'datatalent-glaq-2') }}"
+    schema: raw
+    tables:
+      - name: bmo
+        description: Projets de recrutement BMO 2025, filtré 6 codes FAP IT à l'ingestion (D35)

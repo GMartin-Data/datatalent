@@ -1,0 +1,12 @@
+version: 2
+
+sources:
+  - name: sirene
+    database: "{{ env_var('DBT_PROJECT_ID', 'datatalent-glaq-2') }}"
+    schema: raw
+    tables:
+      # ⚠ Vérifier les noms réels en BigQuery — possible divergence sirene vs sirene_etablissement
+      - name: sirene_etablissement
+        description: Stock INSEE des établissements (~43M lignes, Parquet)
+      - name: sirene_unite_legale
+        description: Stock INSEE des unités légales (~29M lignes). Pas de modèle staging (D14-bis, D50).

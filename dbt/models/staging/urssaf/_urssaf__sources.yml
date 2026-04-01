@@ -1,0 +1,11 @@
+version: 2
+
+sources:
+  - name: urssaf
+    database: "{{ env_var('DBT_PROJECT_ID', 'datatalent-glaq-2') }}"
+    schema: raw
+    tables:
+      - name: urssaf_effectifs
+        description: Effectifs salariés par commune x APE, filtré 4 codes IT à l'ingestion (D37)
+      - name: urssaf_masse_salariale
+        description: Masse salariale brute par NA88, filtré NA88 = 62 à l'ingestion (~30 lignes)
