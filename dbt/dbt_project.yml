@@ -8,7 +8,6 @@ profile: datatalent
 model-paths: ["models"]
 test-paths: ["tests"]
 macro-paths: ["macros"]
-snapshot-paths: ["snapshots"]
 clean-targets: ["target", "dbt_packages"]
 
 models:
