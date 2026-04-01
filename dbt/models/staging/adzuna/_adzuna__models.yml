@@ -1,0 +1,5 @@
+version: 2
+
+models:
+  - name: stg_adzuna__offres
+    description: Offres data engineer Adzuna, déduplication ROW_NUMBER, source = 'adzuna'.

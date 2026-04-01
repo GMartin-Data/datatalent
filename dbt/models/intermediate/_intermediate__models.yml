@@ -1,0 +1,9 @@
+version: 2
+
+models:
+  - name: int_offres_enrichies
+    description: UNION ALL France Travail + Adzuna, enrichi noms géographiques via API Géo.
+  - name: int_densite_sectorielle_commune
+    description: Effectifs et établissements IT agrégés par commune x année.
+  - name: int_tensions_bassin_emploi
+    description: Projets de recrutement IT et taux de difficulté par département x année.

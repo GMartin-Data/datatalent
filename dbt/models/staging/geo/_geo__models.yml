@@ -1,0 +1,9 @@
+version: 2
+
+models:
+  - name: stg_geo__regions
+    description: Régions françaises, renommage camelCase → snake_case.
+  - name: stg_geo__departements
+    description: Départements français, renommage camelCase → snake_case.
+  - name: stg_geo__communes
+    description: Communes françaises (~35 000), renommage camelCase → snake_case.

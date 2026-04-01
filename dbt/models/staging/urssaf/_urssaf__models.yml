@@ -1,0 +1,7 @@
+version: 2
+
+models:
+  - name: stg_urssaf__effectifs_commune_ape
+    description: Effectifs salariés par commune × APE IT, null → 0 en staging.
+  - name: stg_urssaf__masse_salariale_na88
+    description: Masse salariale brute secteur IT (NA88 = 62), ~30 lignes.

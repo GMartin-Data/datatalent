@@ -1,0 +1,5 @@
+version: 2
+
+models:
+  - name: stg_france_travail__offres
+    description: Offres d'emploi IT nettoyées, déduplication ROW_NUMBER, salaire parsé, categorie_metier.
