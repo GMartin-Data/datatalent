@@ -1,0 +1,9 @@
+version: 2
+
+sources:
+  - name: france_travail
+    database: "{{ env_var('DBT_PROJECT_ID', 'datatalent-glaq-2') }}"
+    schema: raw
+    tables:
+      - name: france_travail
+        description: Offres d'emploi IT France Travail (WRITE_APPEND, déduplication en staging)

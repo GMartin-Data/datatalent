@@ -1,0 +1,5 @@
+version: 2
+
+models:
+  - name: stg_bmo__projets_recrutement
+    description: Projets de recrutement IT par bassin × département, 6 codes FAP M1X/M2X.

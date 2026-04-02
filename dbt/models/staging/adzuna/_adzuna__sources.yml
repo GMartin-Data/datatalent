@@ -1,0 +1,9 @@
+version: 2
+
+sources:
+  - name: adzuna
+    database: "{{ env_var('DBT_PROJECT_ID', 'datatalent-glaq-2') }}"
+    schema: raw
+    tables:
+      - name: adzuna
+        description: Offres data engineer Adzuna FR (WRITE_APPEND, déduplication en staging)

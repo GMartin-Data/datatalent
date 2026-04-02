@@ -1,0 +1,5 @@
+version: 2
+
+models:
+  - name: stg_sirene__etablissements
+    description: Établissements actifs INSEE (~17M), livrable technique seul (D14-bis).

@@ -1,0 +1,13 @@
+version: 2
+
+sources:
+  - name: geo
+    database: "{{ env_var('DBT_PROJECT_ID', 'datatalent-glaq-2') }}"
+    schema: raw
+    tables:
+      - name: geo_regions
+        description: Régions françaises (API Géo, snapshot quasi-statique)
+      - name: geo_departements
+        description: Départements français (API Géo)
+      - name: geo_communes
+        description: Communes françaises (~35 000 entrées, API Géo)
