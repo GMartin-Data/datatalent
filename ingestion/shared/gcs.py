@@ -13,7 +13,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 
 logger = get_logger(__name__)
 
-BUCKET_NAME = "datatalent-raw"
+BUCKET_NAME = "datatalent-glaq-2-raw"
 
 
 @retry(
@@ -50,3 +50,26 @@ def upload_to_gcs(local_path: str, gcs_prefix: str) -> str:
     gcs_uri = f"gs://{BUCKET_NAME}/{blob_name}"
     logger.info("file_uploaded", gcs_uri=gcs_uri, size_bytes=path.stat().st_size)
     return gcs_uri
+
+
+def get_most_recent_blob_date(prefix: str) -> datetime | None:
+    """Return the last-modified date of the most recent blob under a prefix.
+
+    Args:
+        prefix: GCS prefix to scan (e.g. "sirene").
+
+    Returns:
+        UTC datetime of the most recently updated blob, or None if no blobs.
+    """
+    client = storage.Client()
+    blobs = list(client.list_blobs(BUCKET_NAME, prefix=f"{prefix}/"))
+    if not blobs:
+        return None
+    most_recent = max(blobs, key=lambda b: b.updated)
+    logger.info(
+        "gcs_most_recent_blob",
+        prefix=prefix,
+        blob_name=most_recent.name,
+        updated=most_recent.updated.isoformat(),
+    )
+    return most_recent.updated
