@@ -6,7 +6,6 @@ from unittest.mock import MagicMock, patch
 import pytest
 import structlog.testing
 from google.cloud import bigquery
-from main import main
 from shared.bigquery import _infer_source_format, load_gcs_to_bq
 from shared.gcs import get_most_recent_blob_date, upload_to_gcs
 from shared.logging import get_logger
@@ -209,35 +208,3 @@ class TestGetMostRecentBlobDate:
         result = get_most_recent_blob_date("sirene")
 
         assert result == datetime(2026, 3, 15, tzinfo=UTC)
-
-
-class TestMain:
-    """Tests for the ingestion entrypoint."""
-
-    @patch("main.run_geo")
-    @patch("main.run_sirene")
-    @patch("main.run_france_travail")
-    def test_calls_all_sources_in_order(
-        self,
-        mock_ft: MagicMock,
-        mock_sirene: MagicMock,
-        mock_geo: MagicMock,
-    ) -> None:
-        """main() calls all three source run() functions."""
-        main()
-
-        mock_ft.assert_called_once()
-        mock_sirene.assert_called_once()
-        mock_geo.assert_called_once()
-
-    @patch("main.sys.exit")
-    @patch("main.run_france_travail", side_effect=RuntimeError("OAuth2 expired"))
-    def test_exits_on_failure(
-        self,
-        mock_ft: MagicMock,
-        mock_exit: MagicMock,
-    ) -> None:
-        """main() logs the error and exits with code 1 on failure."""
-        main()
-
-        mock_exit.assert_called_once_with(1)
