@@ -5,6 +5,8 @@ import json
 import os
 
 import httpx
+from shared.bigquery import load_gcs_to_bq
+from shared.gcs import upload_to_gcs
 from shared.logging import get_logger
 
 from .client import FranceTravailClient
@@ -60,6 +62,14 @@ def run():
 
         write_jsonl(unique_offres, file_path)
         logger.info("file_written", path=file_path, count=len(unique_offres))
+
+    # Upload vers GCS
+    gcs_uri = upload_to_gcs(file_path, "france_travail")
+    logger.info("gcs_upload_complete", gcs_uri=gcs_uri)
+
+    # Load dans BigQuery raw (WRITE_APPEND — D19)
+    load_gcs_to_bq(gcs_uri, "raw", "france_travail_offres", "WRITE_APPEND")
+    logger.info("bq_load_complete", table="raw.france_travail_offres")
 
 
 if __name__ == "__main__":
