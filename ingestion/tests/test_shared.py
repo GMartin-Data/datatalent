@@ -112,12 +112,16 @@ class TestLoadGcsToBq:
         mock_job = mock_client.load_table_from_uri.return_value
 
         load_gcs_to_bq(
-            "gs://datatalent-raw/geo/2026-03-11/regions.json", "raw", "geo_regions"
+            "gs://datatalent-glaq-2-raw/geo/2026-03-11/regions.json",
+            "raw",
+            "geo_regions",
         )
 
         # Verify load_table_from_uri was called with the right URI and table.
         call_args = mock_client.load_table_from_uri.call_args
-        assert call_args[0][0] == "gs://datatalent-raw/geo/2026-03-11/regions.json"
+        assert (
+            call_args[0][0] == "gs://datatalent-glaq-2-raw/geo/2026-03-11/regions.json"
+        )
         assert call_args[0][1] == "raw.geo_regions"
 
         # Verify the job config.
@@ -134,7 +138,9 @@ class TestLoadGcsToBq:
         mock_client = mock_client_cls.return_value
 
         load_gcs_to_bq(
-            "gs://datatalent-raw/sirene/2026-03-11/stock.parquet", "raw", "sirene"
+            "gs://datatalent-glaq-2-raw/sirene/2026-03-11/stock.parquet",
+            "raw",
+            "sirene",
         )
 
         # client.query() is called twice: ALTER then UPDATE.
@@ -144,6 +150,32 @@ class TestLoadGcsToBq:
         assert "_ingestion_date" in queries[0]
         assert "UPDATE" in queries[1]
         assert "CURRENT_DATE()" in queries[1]
+        assert "_ingestion_date IS NULL" in queries[1]
+
+    @patch("shared.bigquery.bigquery.Client")
+    def test_write_append_disposition(self, mock_client_cls: MagicMock) -> None:
+        """load_gcs_to_bq passes WRITE_APPEND to the job config when specified."""
+        mock_client = mock_client_cls.return_value
+
+        load_gcs_to_bq(
+            "gs://bucket/adzuna/2026-03-30/adzuna.jsonl",
+            "raw",
+            "adzuna",
+            write_disposition="WRITE_APPEND",
+        )
+
+        job_config = mock_client.load_table_from_uri.call_args[1]["job_config"]
+        assert job_config.write_disposition == bigquery.WriteDisposition.WRITE_APPEND
+
+    def test_invalid_write_disposition_raises(self) -> None:
+        """load_gcs_to_bq raises ValueError for unsupported write_disposition."""
+        with pytest.raises(ValueError, match="Unsupported write disposition"):
+            load_gcs_to_bq(
+                "gs://bucket/data.json",
+                "raw",
+                "table",
+                write_disposition="WRITE_EMPTY",
+            )
 
 
 class TestGetMostRecentBlobDate:

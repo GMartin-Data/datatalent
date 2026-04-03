@@ -1,7 +1,8 @@
 """Load file from GCS into BigQuery raw tables.
 
 Handles format detection (JSON/Parquet), schema autodetection,
-idempotent writes (WRITE_TRUNCATE), and automatic _ingestion_date stamping.
+configurable write disposition (WRITE_TRUNCATE or WRITE_APPEND),
+and automatic _ingestion_date stamping.
 """
 
 from google.cloud import bigquery
@@ -18,12 +19,19 @@ _FORMAT_MAP: dict[str, bigquery.SourceFormat] = {
     ".parquet": bigquery.SourceFormat.PARQUET,
 }
 
+# Mapping string → BigQuery WriteDisposition enum.
+_DISPOSITION_MAP: dict[str, bigquery.WriteDisposition] = {
+    "WRITE_TRUNCATE": bigquery.WriteDisposition.WRITE_TRUNCATE,
+    "WRITE_APPEND": bigquery.WriteDisposition.WRITE_APPEND,
+}
+
 
 def _infer_source_format(gcs_uri: str) -> bigquery.SourceFormat:
     """Infer BigQuery source format from the GCS URI file extension.
 
     Args:
-        gcs_uri: full GCS URI (e.g. gs://datatalent-raw/sirene/2026-03-11/stock.parquet).
+        gcs_uri: full GCS URI
+            (e.g. gs://datatalent-glaq-2-raw/sirene/2026-03-11/stock.parquet).
 
     Returns:
         Corresponding BigQuery SourceFormat.
@@ -42,47 +50,67 @@ def _infer_source_format(gcs_uri: str) -> bigquery.SourceFormat:
     wait=wait_exponential(multiplier=1, max=10),
     reraise=True,
 )
-def load_gcs_to_bq(gcs_uri: str, dataset: str, table: str) -> None:
+def load_gcs_to_bq(
+    gcs_uri: str,
+    dataset: str,
+    table: str,
+    write_disposition: str = "WRITE_TRUNCATE",
+) -> None:
     """Load a GCS file into a BigQuery table.
 
     Args:
-        gcs_uri: URI returned by upload_to_gcs (e.g. gs://datatalent-raw/geo/2026-03-11/regions.json).
+        gcs_uri: URI returned by upload_to_gcs
+            (e.g. gs://datatalent-glaq-2-raw/geo/2026-03-11/regions.json).
         dataset: BigQuery dataset name (e.g. "raw").
         table: BigQuery table name (e.g. "france_travail").
+        write_disposition: "WRITE_TRUNCATE" (default, full replace) or
+            "WRITE_APPEND" (accumulation for France Travail and Adzuna - D19)
 
     The function:
-    1. Loads the file with WRITE_TRUNCATE (idempotent - full replace on each run).
+    1. Loads the file with the specified write disposition.
     2. Adds an _ingestion_date column set to CURRENT_DATE().
-       This is done via ALTER TABLE + UPDATE after the load, so source scripts
-       don't need to include the field themselves.
+       Only stamps rows where _ingestion_date is NULL, so WRITE_APPEND
+       preserves dates from previous ingestions.
 
     Raises:
-        ValueError: if the file extension is not .json, .jsonl, or .parquet.
+        ValueError: if the file extension or write_disposition is not supported.
         google.api_core.exceptions.GoogleAPIError: after 3 failed attempts.
     """
     source_format = _infer_source_format(gcs_uri)
 
+    disposition = _DISPOSITION_MAP.get(write_disposition)
+    if disposition is None:
+        raise ValueError(
+            f"Unsupported write disposition: {write_disposition}. "
+            "Use WRITE_TRUNCATE or WRITE_APPEND."
+        )
+
     job_config = bigquery.LoadJobConfig(
         source_format=source_format,
         autodetect=True,  # Let BigQuery infer the schema
-        write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE,  # Idempotent
+        write_disposition=disposition,
     )
 
     client = bigquery.Client()
     table_ref = f"{dataset}.{table}"
 
-    # Step 1: Load file from GCS into BigQuery (replaces table contents)
+    # Step 1: Load file from GCS into BigQuery
     job = client.load_table_from_uri(gcs_uri, table_ref, job_config=job_config)
     job.result()  # Block until the load job completes
 
-    # Step 2: Stamp all rows with today's date
-    # WRITE_TRUNCATE guarantees all rows come from this load,
-    # so an unqualified UPDATE is safe and idempotent.
+    # Step 2: Stamp new rows with today's date
     client.query(
         f"ALTER TABLE `{table_ref}` ADD COLUMN IF NOT EXISTS _ingestion_date DATE"
     ).result()
     client.query(
-        f"UPDATE `{table_ref}` SET _ingestion_date = CURRENT_DATE() WHERE TRUE"
+        f"UPDATE `{table_ref}` "
+        "SET _ingestion_date = CURRENT_DATE() "
+        "WHERE _ingestion_date IS NULL"
     ).result()
 
-    logger.info("gcs_loaded_to_bq", gcs_uri=gcs_uri, table=table_ref)
+    logger.info(
+        "gcs_loaded_to_bq",
+        gcs_uri=gcs_uri,
+        table=table_ref,
+        write_disposition=write_disposition,
+    )
