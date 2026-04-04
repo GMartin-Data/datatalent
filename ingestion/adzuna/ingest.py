@@ -77,5 +77,5 @@ def run() -> None:
     gcs_uri = upload_to_gcs(LOCAL_JSONL_PATH, GCS_PREFIX)
     logger.info("adzuna.gcs_uploaded", uri=gcs_uri)
 
-    load_gcs_to_bq(gcs_uri, BQ_DATASET, BQ_TABLE, write_disposition="WRITE_APPEND")
+    load_gcs_to_bq(gcs_uri, BQ_DATASET, BQ_TABLE)
     logger.info("adzuna.done", count=len(mapped_offers))
