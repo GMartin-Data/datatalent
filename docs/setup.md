@@ -3,20 +3,21 @@
 ## Prérequis
 
 - [uv](https://docs.astral.sh/uv/) (gère Python + dépendances)
-```bash
+  ```bash
   # Linux / macOS
   curl -LsSf https://astral.sh/uv/install.sh | sh
   # Windows
   powershell -ExecutionPolicy BypassProcess -c "irm https://astral.sh/uv/install.ps1 | iex"
-```
+  ```
 - pre-commit
-```bash
-uv tool install pre-commit
-```
+  ```bash
+  uv tool install pre-commit
+  ```
 - Git
 - Docker + Docker Compose
 
 ## Installation
+
 ```bash
 # 1. Clone
 git clone git@github.com:GMartin-Data/datatalent.git && cd datatalent
@@ -30,11 +31,21 @@ pre-commit install
 # 4. Fichiers locaux (ne seront jamais committés)
 cp dbt/profiles.yml.example dbt/profiles.yml
 cp infra/terraform.tfvars.example infra/terraform.tfvars
+
+# 5. Variables d'environnement
+cp .env.example .env
 ```
+
+Ouvrir `.env` et remplir les credentials :
+- `FT_CLIENT_ID` / `FT_CLIENT_SECRET` — OAuth2 France Travail
+- `ADZUNA_APP_ID` / `ADZUNA_APP_KEY` — API Adzuna
+
+Les autres sources (Sirene, Géo, URSSAF ×2, BMO) sont publiques et n'ont pas besoin de credentials.
 
 Ouvrir `dbt/profiles.yml` et `infra/terraform.tfvars`, remplacer `<YOUR_GCP_PROJECT_ID>` par votre project ID GCP.
 
 ## Vérification
+
 ```bash
 # Pre-commit fonctionne
 pre-commit run --all-files

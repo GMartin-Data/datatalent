@@ -78,8 +78,8 @@ class TestRun:
     @patch("france_travail.ingest.FranceTravailClient")
     def test_nominal(self, MockClient, mock_gcs, mock_bq, tmp_path, monkeypatch):
         """Flux complet : extract → dédup → JSONL → GCS → BQ."""
-        monkeypatch.setenv("CLIENT_ID", "fake_id")
-        monkeypatch.setenv("CLIENT_SECRET", "fake_secret")
+        monkeypatch.setenv("FT_CLIENT_ID", "fake_id")
+        monkeypatch.setenv("FT_CLIENT_SECRET", "fake_secret")
         monkeypatch.setattr("france_travail.ingest.OUTPUT_DIR", str(tmp_path))
         monkeypatch.setattr("france_travail.ingest.CODES_ROME", ["M1805"])
         monkeypatch.setattr("france_travail.ingest.DEPARTEMENTS", ["75"])
@@ -113,8 +113,8 @@ class TestRun:
     @patch("france_travail.ingest.FranceTravailClient")
     def test_zero_offres(self, MockClient, mock_gcs, mock_bq, tmp_path, monkeypatch):
         """Zéro offre : fichier JSONL vide, GCS et BQ appelés quand même."""
-        monkeypatch.setenv("CLIENT_ID", "fake_id")
-        monkeypatch.setenv("CLIENT_SECRET", "fake_secret")
+        monkeypatch.setenv("FT_CLIENT_ID", "fake_id")
+        monkeypatch.setenv("FT_CLIENT_SECRET", "fake_secret")
         monkeypatch.setattr("france_travail.ingest.OUTPUT_DIR", str(tmp_path))
         monkeypatch.setattr("france_travail.ingest.CODES_ROME", ["M1805"])
         monkeypatch.setattr("france_travail.ingest.DEPARTEMENTS", ["75"])
@@ -142,8 +142,8 @@ class TestRun:
         """Une combinaison ROME×dept échoue en 400, les autres passent."""
         import httpx
 
-        monkeypatch.setenv("CLIENT_ID", "fake_id")
-        monkeypatch.setenv("CLIENT_SECRET", "fake_secret")
+        monkeypatch.setenv("FT_CLIENT_ID", "fake_id")
+        monkeypatch.setenv("FT_CLIENT_SECRET", "fake_secret")
         monkeypatch.setattr("france_travail.ingest.OUTPUT_DIR", str(tmp_path))
         monkeypatch.setattr("france_travail.ingest.CODES_ROME", ["M1805"])
         monkeypatch.setattr("france_travail.ingest.DEPARTEMENTS", ["75", "13"])
@@ -180,8 +180,8 @@ class TestRun:
         """Si l'upload GCS plante, le load BQ ne doit pas être appelé."""
         import pytest
 
-        monkeypatch.setenv("CLIENT_ID", "fake_id")
-        monkeypatch.setenv("CLIENT_SECRET", "fake_secret")
+        monkeypatch.setenv("FT_CLIENT_ID", "fake_id")
+        monkeypatch.setenv("FT_CLIENT_SECRET", "fake_secret")
         monkeypatch.setattr("france_travail.ingest.OUTPUT_DIR", str(tmp_path))
         monkeypatch.setattr("france_travail.ingest.CODES_ROME", ["M1805"])
         monkeypatch.setattr("france_travail.ingest.DEPARTEMENTS", ["75"])

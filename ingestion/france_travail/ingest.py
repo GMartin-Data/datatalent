@@ -32,8 +32,8 @@ def write_jsonl(offres: list[dict], file_path: str) -> None:
 
 def run():
     with FranceTravailClient(
-        client_id=os.environ["CLIENT_ID"],
-        client_secret=os.environ["CLIENT_SECRET"],
+        client_id=os.environ["FT_CLIENT_ID"],
+        client_secret=os.environ["FT_CLIENT_SECRET"],
     ) as client:
         raw_offres = []
 
