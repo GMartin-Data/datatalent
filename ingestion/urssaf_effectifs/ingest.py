@@ -1,5 +1,6 @@
 import json
 
+from google.cloud import bigquery
 from shared.bigquery import load_gcs_to_bq
 from shared.gcs import upload_to_gcs
 from shared.logging import get_logger
@@ -14,6 +15,16 @@ from urssaf_effectifs.config import (
 )
 
 logger = get_logger(__name__)
+
+SCHEMA = [
+    bigquery.SchemaField("code_commune", "STRING"),
+    bigquery.SchemaField("intitule_commune", "STRING"),
+    bigquery.SchemaField("code_departement", "STRING"),
+    bigquery.SchemaField("code_ape", "STRING"),
+    bigquery.SchemaField("annee", "INTEGER"),
+    bigquery.SchemaField("nb_etablissements", "INTEGER"),
+    bigquery.SchemaField("effectifs_salaries", "INTEGER"),
+]
 
 
 def _unpivot(records: list[dict]) -> list[dict]:
@@ -76,7 +87,7 @@ def run() -> None:
     gcs_uri = upload_to_gcs(LOCAL_PATH, GCS_PREFIX)
     logger.info("urssaf_effectifs.gcs_uploaded", uri=gcs_uri)
 
-    load_gcs_to_bq(gcs_uri, BQ_DATASET, BQ_TABLE)
+    load_gcs_to_bq(gcs_uri, BQ_DATASET, BQ_TABLE, schema=SCHEMA)
     logger.info("urssaf_effectifs.bq_loaded", table=f"{BQ_DATASET}.{BQ_TABLE}")
 
     logger.info("urssaf_effectifs.done")
