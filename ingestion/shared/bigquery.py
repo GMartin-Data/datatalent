@@ -55,6 +55,7 @@ def load_gcs_to_bq(
     dataset: str,
     table: str,
     write_disposition: str = "WRITE_TRUNCATE",
+    schema: list[bigquery.SchemaField] | None = None,
 ) -> None:
     """Load a GCS file into a BigQuery table.
 
@@ -90,6 +91,12 @@ def load_gcs_to_bq(
         autodetect=True,  # Let BigQuery infer the schema
         write_disposition=disposition,
     )
+    if schema:
+        job_config.schema = schema
+        job_config.autodetect = False
+        job_config.ignore_unknown_values = True  # Ignore fields in JSON not in schema
+    else:
+        job_config.autodetect = True
 
     client = bigquery.Client()
     table_ref = f"{dataset}.{table}"
