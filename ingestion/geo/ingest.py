@@ -10,6 +10,7 @@ from typing import Any
 
 import httpx
 from geo.config import BASE_URL, RESOURCES
+from google.cloud import bigquery
 from shared.bigquery import load_gcs_to_bq
 from shared.gcs import upload_to_gcs
 from shared.logging import get_logger
@@ -21,6 +22,32 @@ from tenacity import (
 )
 
 logger = get_logger(__name__)
+
+REGIONS_SCHEMA = [
+    bigquery.SchemaField("nom", "STRING"),
+    bigquery.SchemaField("code", "STRING"),
+]
+
+DEPARTEMENTS_SCHEMA = [
+    bigquery.SchemaField("nom", "STRING"),
+    bigquery.SchemaField("code", "STRING"),
+    bigquery.SchemaField("codeRegion", "STRING"),
+]
+
+COMMUNES_SCHEMA = [
+    bigquery.SchemaField("nom", "STRING"),
+    bigquery.SchemaField("code", "STRING"),
+    bigquery.SchemaField("codeDepartement", "STRING"),
+    bigquery.SchemaField("codeRegion", "STRING"),
+    bigquery.SchemaField("codesPostaux", "STRING", mode="REPEATED"),
+    bigquery.SchemaField("population", "INTEGER"),
+]
+
+SCHEMAS: dict[str, list[bigquery.SchemaField]] = {
+    "regions": REGIONS_SCHEMA,
+    "departements": DEPARTEMENTS_SCHEMA,
+    "communes": COMMUNES_SCHEMA,
+}
 
 
 @retry(
@@ -82,7 +109,7 @@ def run() -> None:
 
             table_id = f"geo_{resource}"
 
-            load_gcs_to_bq(gcs_uri, "raw", table_id)
+            load_gcs_to_bq(gcs_uri, "raw", table_id, schema=SCHEMAS[resource])
 
             logger.info("bq_load_ok", table=f"raw.{table_id}")
 

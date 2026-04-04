@@ -176,6 +176,44 @@ class TestLoadGcsToBq:
                 write_disposition="WRITE_EMPTY",
             )
 
+    @patch("shared.bigquery.bigquery.Client")
+    def test_explicit_schema_disables_autodetect(
+        self, mock_client_cls: MagicMock
+    ) -> None:
+        """load_gcs_to_bq sets autodetect=False and uses provided schema."""
+        mock_client = mock_client_cls.return_value
+
+        schema = [
+            bigquery.SchemaField("nom", "STRING"),
+            bigquery.SchemaField("code", "STRING"),
+        ]
+
+        load_gcs_to_bq(
+            "gs://bucket/geo/2026-04-04/regions.json",
+            "raw",
+            "geo_regions",
+            schema=schema,
+        )
+
+        job_config = mock_client.load_table_from_uri.call_args[1]["job_config"]
+        assert job_config.autodetect is False
+        assert job_config.schema == schema
+
+    @patch("shared.bigquery.bigquery.Client")
+    def test_no_schema_enables_autodetect(self, mock_client_cls: MagicMock) -> None:
+        """load_gcs_to_bq defaults to autodetect=True when no schema provided."""
+        mock_client = mock_client_cls.return_value
+
+        load_gcs_to_bq(
+            "gs://bucket/geo/2026-04-04/regions.json",
+            "raw",
+            "geo_regions",
+        )
+
+        job_config = mock_client.load_table_from_uri.call_args[1]["job_config"]
+        assert job_config.autodetect is True
+        assert job_config.schema is None
+
 
 class TestGetMostRecentBlobDate:
     """Tests for get_most_recent_blob_date()."""

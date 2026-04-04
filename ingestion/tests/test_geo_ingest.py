@@ -2,6 +2,7 @@ from unittest.mock import ANY, MagicMock, call, patch
 
 import httpx
 import pytest
+from geo.ingest import COMMUNES_SCHEMA, DEPARTEMENTS_SCHEMA, REGIONS_SCHEMA
 
 import ingestion.geo.ingest as ingest_module
 
@@ -42,9 +43,14 @@ def test_run_happy_path(mock_load, mock_upload, mock_get, mock_logger):
 
     mock_load.assert_has_calls(
         [
-            call("gs://fake/path.jsonl", "raw", "geo_regions"),
-            call("gs://fake/path.jsonl", "raw", "geo_departements"),
-            call("gs://fake/path.jsonl", "raw", "geo_communes"),
+            call("gs://fake/path.jsonl", "raw", "geo_regions", schema=REGIONS_SCHEMA),
+            call(
+                "gs://fake/path.jsonl",
+                "raw",
+                "geo_departements",
+                schema=DEPARTEMENTS_SCHEMA,
+            ),
+            call("gs://fake/path.jsonl", "raw", "geo_communes", schema=COMMUNES_SCHEMA),
         ],
         any_order=True,
     )
