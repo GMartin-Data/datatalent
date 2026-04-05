@@ -68,8 +68,8 @@ def run():
     logger.info("gcs_upload_complete", gcs_uri=gcs_uri)
 
     # Load dans BigQuery raw (WRITE_APPEND — D19)
-    load_gcs_to_bq(gcs_uri, "raw", "france_travail_offres", "WRITE_APPEND")
-    logger.info("bq_load_complete", table="raw.france_travail_offres")
+    load_gcs_to_bq(gcs_uri, "raw", "france_travail", "WRITE_APPEND")
+    logger.info("bq_load_complete", table="raw.france_travail")
 
 
 if __name__ == "__main__":

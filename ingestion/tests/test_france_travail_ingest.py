@@ -101,7 +101,7 @@ class TestRun:
         mock_bq.assert_called_once_with(
             "gs://datatalent-glaq-2-raw/france_travail/2026-04-03/file.jsonl",
             "raw",
-            "france_travail_offres",
+            "france_travail",
             "WRITE_APPEND",
         )
 
