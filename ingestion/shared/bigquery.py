@@ -56,6 +56,8 @@ def load_gcs_to_bq(
     table: str,
     write_disposition: str = "WRITE_TRUNCATE",
     schema: list[bigquery.SchemaField] | None = None,
+    time_partitioning: bigquery.TimePartitioning | None = None,
+    clustering_fields: list[str] | None = None,
 ) -> None:
     """Load a GCS file into a BigQuery table.
 
@@ -65,7 +67,18 @@ def load_gcs_to_bq(
         dataset: BigQuery dataset name (e.g. "raw").
         table: BigQuery table name (e.g. "france_travail").
         write_disposition: "WRITE_TRUNCATE" (default, full replace) or
-            "WRITE_APPEND" (accumulation for France Travail and Adzuna - D19)
+            "WRITE_APPEND" (accumulation for France Travail and Adzuna - D19).
+        schema: optional list of BigQuery SchemaField to force column types.
+            If provided, disables autodetect and enables ignore_unknown_values
+            (fields present in JSON but absent from schema are silently dropped).
+            Required when autodetect infers incorrect types (e.g. Corsican codes
+            2A/2B inferred as INTEGER instead of STRING).
+        time_partitioning: optional BigQuery TimePartitioning config.
+            Example: bigquery.TimePartitioning(field="_ingestion_date").
+            Applied at table creation — has no effect on existing tables.
+        clustering_fields: optional list of columns to cluster by.
+            Example: ["code_commune", "categorie_metier"].
+            Ignored by BigQuery if time_partitioning is not set.
 
     The function:
     1. Loads the file with the specified write disposition.
@@ -97,6 +110,10 @@ def load_gcs_to_bq(
         job_config.ignore_unknown_values = True  # Ignore fields in JSON not in schema
     else:
         job_config.autodetect = True
+    if time_partitioning:
+        job_config.time_partitioning = time_partitioning
+    if clustering_fields:
+        job_config.clustering_fields = clustering_fields
 
     client = bigquery.Client()
     table_ref = f"{dataset}.{table}"
@@ -120,4 +137,6 @@ def load_gcs_to_bq(
         gcs_uri=gcs_uri,
         table=table_ref,
         write_disposition=write_disposition,
+        time_partitioning_field=time_partitioning.field if time_partitioning else None,
+        clustering_fields=clustering_fields,
     )

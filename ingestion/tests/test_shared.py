@@ -214,6 +214,45 @@ class TestLoadGcsToBq:
         assert job_config.autodetect is True
         assert job_config.schema is None
 
+    @patch("shared.bigquery.bigquery.Client")
+    def test_time_partitioning_passed_to_job_config(
+        self, mock_client_cls: MagicMock
+    ) -> None:
+        """load_gcs_to_bq sets time_partitioning on the job config when provided."""
+        mock_client = mock_client_cls.return_value
+        partitioning = bigquery.TimePartitioning(field="_ingestion_date")
+
+        load_gcs_to_bq(
+            "gs://bucket/france_travail/2026-04-05/offres.json",
+            "raw",
+            "france_travail",
+            write_disposition="WRITE_APPEND",
+            time_partitioning=partitioning,
+        )
+
+        job_config = mock_client.load_table_from_uri.call_args[1]["job_config"]
+        assert job_config.time_partitioning == partitioning
+
+    @patch("shared.bigquery.bigquery.Client")
+    def test_clustering_fields_passed_to_job_config(
+        self, mock_client_cls: MagicMock
+    ) -> None:
+        """load_gcs_to_bq sets clustering_fields on the job config when provided."""
+        mock_client = mock_client_cls.return_value
+        clustering = ["code_commune", "categorie_metier"]
+
+        load_gcs_to_bq(
+            "gs://bucket/france_travail/2026-04-05/offres.json",
+            "raw",
+            "france_travail",
+            write_disposition="WRITE_APPEND",
+            time_partitioning=bigquery.TimePartitioning(field="_ingestion_date"),
+            clustering_fields=clustering,
+        )
+
+        job_config = mock_client.load_table_from_uri.call_args[1]["job_config"]
+        assert job_config.clustering_fields == clustering
+
 
 class TestGetMostRecentBlobDate:
     """Tests for get_most_recent_blob_date()."""
