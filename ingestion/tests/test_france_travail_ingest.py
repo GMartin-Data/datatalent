@@ -107,6 +107,10 @@ class TestRun:
             time_partitioning=bigquery.TimePartitioning(field="_ingestion_date"),
         )
 
+        # Verify _ingestion_date was stamped
+        first_line = json.loads(jsonl_files[0].read_text().strip().split("\n")[0])
+        assert "_ingestion_date" in first_line
+
     @patch("france_travail.ingest.load_gcs_to_bq")
     @patch(
         "france_travail.ingest.upload_to_gcs",

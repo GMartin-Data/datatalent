@@ -62,6 +62,10 @@ def run():
         unique_offres = deduplicate_offres(raw_offres)
         logger.info("dedup_complete", raw=len(raw_offres), unique=len(unique_offres))
 
+        today = str(datetime.date.today())
+        for offre in unique_offres:
+            offre["_ingestion_date"] = today
+
         filename = f"france_travail_{datetime.date.today().isoformat()}.jsonl"
         file_path = os.path.join(OUTPUT_DIR, filename)
 
