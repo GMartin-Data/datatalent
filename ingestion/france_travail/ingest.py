@@ -1,10 +1,15 @@
-"""Orchestration de l'ingestion France Travail — extract → JSON local."""
+"""Orchestration de l'ingestion France Travail — extract → JSON local → GCS → BigQuery.
+
+La table raw.france_travail est partitionnée par _ingestion_date
+(WRITE_APPEND — D19, D26).
+"""
 
 import datetime
 import json
 import os
 
 import httpx
+from google.cloud import bigquery
 from shared.bigquery import load_gcs_to_bq
 from shared.gcs import upload_to_gcs
 from shared.logging import get_logger
@@ -68,7 +73,13 @@ def run():
     logger.info("gcs_upload_complete", gcs_uri=gcs_uri)
 
     # Load dans BigQuery raw (WRITE_APPEND — D19)
-    load_gcs_to_bq(gcs_uri, "raw", "france_travail", "WRITE_APPEND")
+    load_gcs_to_bq(
+        gcs_uri,
+        "raw",
+        "france_travail",
+        write_disposition="WRITE_APPEND",
+        time_partitioning=bigquery.TimePartitioning(field="_ingestion_date"),
+    )
     logger.info("bq_load_complete", table="raw.france_travail")
 
 

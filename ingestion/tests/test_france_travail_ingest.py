@@ -5,6 +5,7 @@ import os
 from unittest.mock import patch
 
 from france_travail.ingest import deduplicate_offres, run, write_jsonl
+from google.cloud import bigquery
 
 
 class TestDeduplicateOffres:
@@ -102,7 +103,8 @@ class TestRun:
             "gs://datatalent-glaq-2-raw/france_travail/2026-04-03/file.jsonl",
             "raw",
             "france_travail",
-            "WRITE_APPEND",
+            write_disposition="WRITE_APPEND",
+            time_partitioning=bigquery.TimePartitioning(field="_ingestion_date"),
         )
 
     @patch("france_travail.ingest.load_gcs_to_bq")
