@@ -82,9 +82,11 @@ def load_gcs_to_bq(
 
     The function:
     1. Loads the file with the specified write disposition.
-    2. Adds an _ingestion_date column set to CURRENT_DATE().
-       Only stamps rows where _ingestion_date is NULL, so WRITE_APPEND
-       preserves dates from previous ingestions.
+    2. If time_partitioning is not set: adds an _ingestion_date column
+       set to CURRENT_DATE(). Only stamps rows where _ingestion_date
+       is NULL, so WRITE_APPEND preserves dates from previous ingestions.
+       If time_partitioning is set: skipped — the source is expected
+       to pre-stamp _ingestion_date in the data before GCS upload.
 
     Raises:
         ValueError: if the file extension or write_disposition is not supported.
@@ -123,14 +125,17 @@ def load_gcs_to_bq(
     job.result()  # Block until the load job completes
 
     # Step 2: Stamp new rows with today's date
-    client.query(
-        f"ALTER TABLE `{table_ref}` ADD COLUMN IF NOT EXISTS _ingestion_date DATE"
-    ).result()
-    client.query(
-        f"UPDATE `{table_ref}` "
-        "SET _ingestion_date = CURRENT_DATE() "
-        "WHERE _ingestion_date IS NULL"
-    ).result()
+    # Skipped when time_partitioning is set: the source pre-stamps
+    # _ingestion_date in the data before upload to GCS
+    if time_partitioning is None:
+        client.query(
+            f"ALTER TABLE `{table_ref}` ADD COLUMN IF NOT EXISTS _ingestion_date DATE"
+        ).result()
+        client.query(
+            f"UPDATE `{table_ref}` "
+            "SET _ingestion_date = CURRENT_DATE() "
+            "WHERE _ingestion_date IS NULL"
+        ).result()
 
     logger.info(
         "gcs_loaded_to_bq",

@@ -152,6 +152,24 @@ class TestLoadGcsToBq:
         assert "_ingestion_date IS NULL" in queries[1]
 
     @patch("shared.bigquery.bigquery.Client")
+    def test_skips_ingestion_date_stamp_when_partitioned(
+        self, mock_client_cls: MagicMock
+    ) -> None:
+        """load_gcs_to_bq skips ALTER + UPDATE when time_partitioning is set."""
+        mock_client = mock_client_cls.return_value
+
+        load_gcs_to_bq(
+            "gs://bucket/france_travail/2026-04-05/offres.json",
+            "raw",
+            "france_travail",
+            write_disposition="WRITE_APPEND",
+            time_partitioning=bigquery.TimePartitioning(field="_ingestion_date"),
+        )
+
+        # client.query() should NOT be called (no ALTER, no UPDATE)
+        mock_client.query.assert_not_called()
+
+    @patch("shared.bigquery.bigquery.Client")
     def test_write_append_disposition(self, mock_client_cls: MagicMock) -> None:
         """load_gcs_to_bq passes WRITE_APPEND to the job config when specified."""
         mock_client = mock_client_cls.return_value
