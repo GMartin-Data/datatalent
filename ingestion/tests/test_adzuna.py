@@ -276,6 +276,7 @@ class TestRun:
             "gs://datatalent-raw/adzuna/2026-03-30/adzuna.jsonl",
             "raw",
             "adzuna",
+            write_disposition="WRITE_APPEND",
         )
 
     @patch("adzuna.ingest.load_gcs_to_bq")
