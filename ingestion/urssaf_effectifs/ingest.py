@@ -1,4 +1,5 @@
 import json
+from datetime import date
 
 from google.cloud import bigquery
 from shared.bigquery import load_gcs_to_bq
@@ -24,6 +25,7 @@ SCHEMA = [
     bigquery.SchemaField("annee", "INTEGER"),
     bigquery.SchemaField("nb_etablissements", "INTEGER"),
     bigquery.SchemaField("effectifs_salaries", "INTEGER"),
+    bigquery.SchemaField("_ingestion_date", "DATE"),
 ]
 
 
@@ -73,21 +75,35 @@ def _write_jsonl(records: list[dict], path: str) -> None:
 
 def run() -> None:
     """Point d'entrée principal - appelé par main.py."""
-    logger.info("urssaf_effectifs.start")
+    logger.info("ingestion_start")
 
     raw_records = fetch_records()
-    logger.info("urssaf_effectifs.fetched", count=len(raw_records))
+    logger.info("fetched", count=len(raw_records))
 
     long_records = _unpivot(raw_records)
-    logger.info("urssaf_effectifs.unpivoted", count=len(long_records))
+    logger.info("unpivoted", count=len(long_records))
+
+    today = str(date.today())
+    for record in long_records:
+        record["_ingestion_date"] = today
 
     _write_jsonl(long_records, LOCAL_PATH)
-    logger.info("urssaf_effectifs.jsonl_written", path=LOCAL_PATH)
+    logger.info("jsonl_written", path=LOCAL_PATH)
 
     gcs_uri = upload_to_gcs(LOCAL_PATH, GCS_PREFIX)
-    logger.info("urssaf_effectifs.gcs_uploaded", uri=gcs_uri)
+    logger.info("gcs_uploaded", uri=gcs_uri)
 
     load_gcs_to_bq(gcs_uri, BQ_DATASET, BQ_TABLE, schema=SCHEMA)
-    logger.info("urssaf_effectifs.bq_loaded", table=f"{BQ_DATASET}.{BQ_TABLE}")
+    logger.info("bq_loaded", table=f"{BQ_DATASET}.{BQ_TABLE}")
 
-    logger.info("urssaf_effectifs.done")
+    logger.info("ingestion_end")
+
+
+if __name__ == "__main__":
+    import sys
+
+    try:
+        run()
+    except Exception as exc:
+        logger.exception("ingestion_failed", error=str(exc))
+        sys.exit(1)

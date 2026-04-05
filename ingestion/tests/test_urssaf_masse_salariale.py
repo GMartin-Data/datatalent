@@ -1,5 +1,4 @@
-# ingestion/tests/test_urssaf_masse_salariale.py
-
+import json
 from unittest.mock import patch
 
 from urssaf_masse_salariale.client import fetch_records
@@ -78,6 +77,12 @@ def test_run_happy_path(mock_fetch, mock_upload, mock_load_bq, tmp_path, monkeyp
     )
 
     run()
+
+    written = (
+        (tmp_path / "urssaf_masse_salariale.jsonl").read_text().strip().split("\n")
+    )
+    first_record = json.loads(written[0])
+    assert "_ingestion_date" in first_record
 
     mock_fetch.assert_called_once()
     mock_upload.assert_called_once()

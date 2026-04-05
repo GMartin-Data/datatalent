@@ -2,6 +2,7 @@
 
 import json
 import tempfile
+from datetime import date
 from pathlib import Path
 
 import httpx
@@ -50,35 +51,50 @@ def _write_jsonl(records: list[dict], dest: Path) -> None:
 
 def run() -> None:
     """Point d'entrée du module BMO - appelé par main.py."""
-    logger.info("bmo.start")
+    logger.info("ingestion_start")
 
     with tempfile.TemporaryDirectory() as tmp_dir:
         tmp = Path(tmp_dir)
 
         # 1. Téléchargement XLSX
         xlsx_path = tmp / "bmo.xlsx"
-        logger.info("bmo.download_start", url=BMO_XLSX_URL)
+        logger.info("download_start", url=BMO_XLSX_URL)
         _download_xlsx(BMO_XLSX_URL, xlsx_path)
-        logger.info("bmo.download_done", size_bytes=xlsx_path.stat().st_size)
+        logger.info("download_end", size_bytes=xlsx_path.stat().st_size)
 
         # 2. Parsing + Filtrage IT
         records = parse_bmo_xlsx(xlsx_path)
-        logger.info("bmo.parse_done", records_count=len(records))
+        logger.info("parse_done", records_count=len(records))
 
         if not records:
-            logger.warning("bmo.no_records", msg="Aucune ligne IT trouvée - abandon")
+            logger.warning("no_records", msg="Aucune ligne IT trouvée - abandon")
             return
 
-        # 3. Écriture JSONL local
+        # 3. Stamp _ingestion_date
+        today = str(date.today())
+        for record in records:
+            record["_ingestion_date"] = today
+
+        # 4. Écriture JSONL local
         jsonl_path = tmp / "bmo.jsonl"
         _write_jsonl(records, jsonl_path)
 
-        # 4. Upload GCS
+        # 5. Upload GCS
         gcs_uri = upload_to_gcs(str(jsonl_path), GCS_PREFIX)
-        logger.info("bmo.gcs_uploaded", uri=gcs_uri)
+        logger.info("gcs_uploaded", uri=gcs_uri)
 
-        # 5. Chargement BigQuery raw
+        # 6. Chargement BigQuery raw
         load_gcs_to_bq(gcs_uri, BQ_DATASET, BQ_TABLE)
-        logger.info("bmo.bq_loaded", table=f"{BQ_DATASET}.{BQ_TABLE}")
+        logger.info("bq_loaded", table=f"{BQ_DATASET}.{BQ_TABLE}")
 
-        logger.info("bmo.done")
+        logger.info("ingestion_end")
+
+
+if __name__ == "__main__":
+    import sys
+
+    try:
+        run()
+    except Exception as exc:
+        logger.exception("ingestion_failed", error=str(exc))
+        sys.exit(1)

@@ -1,10 +1,15 @@
-"""Orchestration de l'ingestion France Travail — extract → JSON local."""
+"""Orchestration de l'ingestion France Travail — extract → JSON local → GCS → BigQuery.
+
+La table raw.france_travail est partitionnée par _ingestion_date
+(WRITE_APPEND — D19, D26).
+"""
 
 import datetime
 import json
 import os
 
 import httpx
+from google.cloud import bigquery
 from shared.bigquery import load_gcs_to_bq
 from shared.gcs import upload_to_gcs
 from shared.logging import get_logger
@@ -39,7 +44,11 @@ def run():
 
         for code in CODES_ROME:
             for dept in DEPARTEMENTS:
-                logger.info("ingestion_start", code_rome=code, departement=dept)
+                logger.info(
+                    "ingestion_start",
+                    code_rome=code,
+                    departement=dept,
+                )
                 try:
                     offres = client.fetch_offres(code, dept)
                 except httpx.HTTPStatusError as e:
@@ -55,22 +64,48 @@ def run():
                 raw_offres.extend(offres)
 
         unique_offres = deduplicate_offres(raw_offres)
-        logger.info("dedup_complete", raw=len(raw_offres), unique=len(unique_offres))
+        logger.info(
+            "dedup_complete",
+            raw=len(raw_offres),
+            unique=len(unique_offres),
+        )
+
+        today = str(datetime.date.today())
+        for offre in unique_offres:
+            offre["_ingestion_date"] = today
 
         filename = f"france_travail_{datetime.date.today().isoformat()}.jsonl"
         file_path = os.path.join(OUTPUT_DIR, filename)
 
         write_jsonl(unique_offres, file_path)
-        logger.info("file_written", path=file_path, count=len(unique_offres))
+        logger.info(
+            "file_written",
+            path=file_path,
+            count=len(unique_offres),
+        )
 
     # Upload vers GCS
     gcs_uri = upload_to_gcs(file_path, "france_travail")
     logger.info("gcs_upload_complete", gcs_uri=gcs_uri)
 
     # Load dans BigQuery raw (WRITE_APPEND — D19)
-    load_gcs_to_bq(gcs_uri, "raw", "france_travail_offres", "WRITE_APPEND")
-    logger.info("bq_load_complete", table="raw.france_travail_offres")
+    load_gcs_to_bq(
+        gcs_uri,
+        "raw",
+        "france_travail",
+        write_disposition="WRITE_APPEND",
+        time_partitioning=bigquery.TimePartitioning(field="_ingestion_date"),
+    )
+    logger.info("bq_load_complete", table="raw.france_travail")
+
+    logger.info("ingestion_end")
 
 
 if __name__ == "__main__":
-    run()
+    import sys
+
+    try:
+        run()
+    except Exception as exc:
+        logger.exception("ingestion_failed", error=str(exc))
+        sys.exit(1)

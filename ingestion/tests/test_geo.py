@@ -34,6 +34,8 @@ def test_run_happy_path(mock_load, mock_upload, mock_get, mock_logger):
 
     ingest_module.run()
 
+    assert "_ingestion_date" in false_response[0]
+
     assert mock_get.call_count == 3
     assert mock_logger.info.called
 

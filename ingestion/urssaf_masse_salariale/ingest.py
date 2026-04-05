@@ -1,4 +1,5 @@
 import json
+from datetime import date
 
 from shared.bigquery import load_gcs_to_bq
 from shared.gcs import upload_to_gcs
@@ -47,19 +48,34 @@ def _write_jsonl(records: list[dict], path: str) -> None:
 
 def run() -> None:
     """Point d'entrée principal, appelé par main.py."""
-    logger.info("urssaf_masse_salariale.start")
+    logger.info("ingestion_start")
 
     raw_records = fetch_records()
-    logger.info("urssaf_masse_salariale.fetched", count=len(raw_records))
+    logger.info("fetched", count=len(raw_records))
 
     transformed = _transform(raw_records)
+
+    today = str(date.today())
+    for record in transformed:
+        record["_ingestion_date"] = today
+
     _write_jsonl(transformed, LOCAL_PATH)
-    logger.info("urssaf_masse_salariale.jsonl_written", path=LOCAL_PATH)
+    logger.info("jsonl_written", path=LOCAL_PATH)
 
     gcs_uri = upload_to_gcs(LOCAL_PATH, GCS_PREFIX)
-    logger.info("urssaf_masse_salariale.gcs_uploaded", uri=gcs_uri)
+    logger.info("gcs_uploaded", uri=gcs_uri)
 
     load_gcs_to_bq(gcs_uri, BQ_DATASET, BQ_TABLE)
-    logger.info("urssaf_masse_salariale.bq_loaded", table=f"{BQ_DATASET}.{BQ_TABLE}")
+    logger.info("bq_loaded", table=f"{BQ_DATASET}.{BQ_TABLE}")
 
-    logger.info("urssaf_masse_salariale.done")
+    logger.info("ingestion_end")
+
+
+if __name__ == "__main__":
+    import sys
+
+    try:
+        run()
+    except Exception as exc:
+        logger.exception("ingestion_failed", error=str(exc))
+        sys.exit(1)

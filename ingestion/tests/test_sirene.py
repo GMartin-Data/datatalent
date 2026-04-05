@@ -289,6 +289,7 @@ def test_run_calls_process_for_each_resource(monkeypatch):
         "sirene.ingest.fetch_dataset_metadata", fake_fetch_dataset_metadata
     )
     monkeypatch.setattr("sirene.ingest.process_one_resource", fake_process_one_resource)
+    monkeypatch.setattr("sirene.ingest._most_recent_blob_age_days", lambda: 45)
 
     outputs = run()
 

@@ -7,6 +7,7 @@ import httpx
 import pytest
 from adzuna.client import fetch_all_offers
 from adzuna.ingest import _extract_value, _map_offer, run
+from google.cloud import bigquery
 
 
 def _mock_response(status_code: int = 200, json_data: dict | None = None) -> MagicMock:
@@ -269,6 +270,7 @@ class TestRun:
         assert record["offre_id"] == "1"
         assert record["entreprise_nom"] == "Acme"
         assert record["salaire_min"] is None
+        assert "_ingestion_date" in record
 
         # Vérification appels shared/
         mock_gcs.assert_called_once_with(jsonl_path, "adzuna")
@@ -277,6 +279,7 @@ class TestRun:
             "raw",
             "adzuna",
             write_disposition="WRITE_APPEND",
+            time_partitioning=bigquery.TimePartitioning(field="_ingestion_date"),
         )
 
     @patch("adzuna.ingest.load_gcs_to_bq")
