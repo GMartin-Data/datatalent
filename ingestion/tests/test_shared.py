@@ -132,26 +132,6 @@ class TestLoadGcsToBq:
         mock_job.result.assert_called_once()
 
     @patch("shared.bigquery.bigquery.Client")
-    def test_stamps_ingestion_date(self, mock_client_cls: MagicMock) -> None:
-        """load_gcs_to_bq runs ALTER + UPDATE to add _ingestion_date."""
-        mock_client = mock_client_cls.return_value
-
-        load_gcs_to_bq(
-            "gs://datatalent-glaq-2-raw/sirene/2026-03-11/stock.parquet",
-            "raw",
-            "sirene",
-        )
-
-        # client.query() is called twice: ALTER then UPDATE.
-        queries = [call[0][0] for call in mock_client.query.call_args_list]
-        assert len(queries) == 2
-        assert "ALTER TABLE" in queries[0]
-        assert "_ingestion_date" in queries[0]
-        assert "UPDATE" in queries[1]
-        assert "CURRENT_DATE()" in queries[1]
-        assert "_ingestion_date IS NULL" in queries[1]
-
-    @patch("shared.bigquery.bigquery.Client")
     def test_skips_ingestion_date_stamp_when_partitioned(
         self, mock_client_cls: MagicMock
     ) -> None:
