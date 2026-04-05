@@ -4,6 +4,7 @@ La table raw.adzuna est partitionnée par _ingestion_date (WRITE_APPEND — D19,
 """
 
 import json
+from datetime import date
 
 from google.cloud import bigquery
 from shared.bigquery import load_gcs_to_bq
@@ -74,6 +75,10 @@ def run() -> None:
 
     mapped_offers = [_map_offer(offer) for offer in raw_offers]
     logger.info("adzuna.offers_mapped", count=len(mapped_offers))
+
+    today = str(date.today())
+    for offer in mapped_offers:
+        offer["_ingestion_date"] = today
 
     _write_jsonl(mapped_offers, LOCAL_JSONL_PATH)
     logger.info("adzuna.jsonl_written", path=LOCAL_JSONL_PATH)

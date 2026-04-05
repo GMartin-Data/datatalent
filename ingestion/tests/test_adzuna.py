@@ -270,6 +270,7 @@ class TestRun:
         assert record["offre_id"] == "1"
         assert record["entreprise_nom"] == "Acme"
         assert record["salaire_min"] is None
+        assert "_ingestion_date" in record
 
         # Vérification appels shared/
         mock_gcs.assert_called_once_with(jsonl_path, "adzuna")
