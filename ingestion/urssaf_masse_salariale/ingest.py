@@ -1,4 +1,5 @@
 import json
+from datetime import date
 
 from shared.bigquery import load_gcs_to_bq
 from shared.gcs import upload_to_gcs
@@ -53,6 +54,11 @@ def run() -> None:
     logger.info("urssaf_masse_salariale.fetched", count=len(raw_records))
 
     transformed = _transform(raw_records)
+
+    today = str(date.today())
+    for record in transformed:
+        record["_ingestion_date"] = today
+
     _write_jsonl(transformed, LOCAL_PATH)
     logger.info("urssaf_masse_salariale.jsonl_written", path=LOCAL_PATH)
 
