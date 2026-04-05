@@ -110,3 +110,7 @@ def test_run_happy_path(mock_write, mock_fetch, mock_upload, mock_load_bq):
     mock_write.assert_called_once()
     mock_upload.assert_called_once()
     mock_load_bq.assert_called_once()
+
+    # Verify _ingestion_date was stamped
+    written_records = mock_write.call_args[0][0]
+    assert all("_ingestion_date" in r for r in written_records)

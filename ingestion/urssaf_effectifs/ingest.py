@@ -1,4 +1,5 @@
 import json
+from datetime import date
 
 from google.cloud import bigquery
 from shared.bigquery import load_gcs_to_bq
@@ -24,6 +25,7 @@ SCHEMA = [
     bigquery.SchemaField("annee", "INTEGER"),
     bigquery.SchemaField("nb_etablissements", "INTEGER"),
     bigquery.SchemaField("effectifs_salaries", "INTEGER"),
+    bigquery.SchemaField("_ingestion_date", "DATE"),
 ]
 
 
@@ -80,6 +82,10 @@ def run() -> None:
 
     long_records = _unpivot(raw_records)
     logger.info("urssaf_effectifs.unpivoted", count=len(long_records))
+
+    today = str(date.today())
+    for record in long_records:
+        record["_ingestion_date"] = today
 
     _write_jsonl(long_records, LOCAL_PATH)
     logger.info("urssaf_effectifs.jsonl_written", path=LOCAL_PATH)
