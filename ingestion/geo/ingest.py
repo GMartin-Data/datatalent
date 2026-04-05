@@ -6,6 +6,7 @@ dépose les fichiers JSON dans GCS et charge les tables raw dans BigQuery.
 
 import json
 import os
+from datetime import date
 from typing import Any
 
 import httpx
@@ -26,12 +27,14 @@ logger = get_logger(__name__)
 REGIONS_SCHEMA = [
     bigquery.SchemaField("nom", "STRING"),
     bigquery.SchemaField("code", "STRING"),
+    bigquery.SchemaField("_ingestion_date", "DATE"),
 ]
 
 DEPARTEMENTS_SCHEMA = [
     bigquery.SchemaField("nom", "STRING"),
     bigquery.SchemaField("code", "STRING"),
     bigquery.SchemaField("codeRegion", "STRING"),
+    bigquery.SchemaField("_ingestion_date", "DATE"),
 ]
 
 COMMUNES_SCHEMA = [
@@ -41,6 +44,7 @@ COMMUNES_SCHEMA = [
     bigquery.SchemaField("codeRegion", "STRING"),
     bigquery.SchemaField("codesPostaux", "STRING", mode="REPEATED"),
     bigquery.SchemaField("population", "INTEGER"),
+    bigquery.SchemaField("_ingestion_date", "DATE"),
 ]
 
 SCHEMAS: dict[str, list[bigquery.SchemaField]] = {
@@ -94,6 +98,10 @@ def run() -> None:
     for resource in RESOURCES:
         try:
             data = fetch_geo_data(resource)
+
+            today = str(date.today())
+            for row in data:
+                row["_ingestion_date"] = today
 
             local_path = f"/tmp/geo_{resource}.json"
             jsonl_data = "\n".join(json.dumps(row) for row in data)
