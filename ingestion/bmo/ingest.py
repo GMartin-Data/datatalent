@@ -2,6 +2,7 @@
 
 import json
 import tempfile
+from datetime import date
 from pathlib import Path
 
 import httpx
@@ -69,15 +70,20 @@ def run() -> None:
             logger.warning("bmo.no_records", msg="Aucune ligne IT trouvée - abandon")
             return
 
-        # 3. Écriture JSONL local
+        # 3. Stamp _ingestion_date
+        today = str(date.today())
+        for record in records:
+            record["_ingestion_date"] = today
+
+        # 4. Écriture JSONL local
         jsonl_path = tmp / "bmo.jsonl"
         _write_jsonl(records, jsonl_path)
 
-        # 4. Upload GCS
+        # 5. Upload GCS
         gcs_uri = upload_to_gcs(str(jsonl_path), GCS_PREFIX)
         logger.info("bmo.gcs_uploaded", uri=gcs_uri)
 
-        # 5. Chargement BigQuery raw
+        # 6. Chargement BigQuery raw
         load_gcs_to_bq(gcs_uri, BQ_DATASET, BQ_TABLE)
         logger.info("bmo.bq_loaded", table=f"{BQ_DATASET}.{BQ_TABLE}")
 

@@ -211,6 +211,9 @@ class TestBmoIngest:
 
         run()
 
+        # Verify _ingestion_date was stamped before writing JSONL
+        assert "_ingestion_date" in mock_parse.return_value[0]
+
         mock_download.assert_called_once()
         mock_parse.assert_called_once()
         mock_gcs.assert_called_once()
