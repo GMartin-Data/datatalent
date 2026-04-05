@@ -91,7 +91,7 @@ def run() -> None:
     Raises:
         RuntimeError: if at least one resource failed ingestion.
     """
-    logger.info("ingestion_start", source="geo", resources=list(RESOURCES.keys()))
+    logger.info("ingestion_start", resources=list(RESOURCES.keys()))
 
     errors: list[str] = []
 
@@ -135,8 +135,13 @@ def run() -> None:
         logger.error("ingestion_partial_failure", failed=errors)
         raise RuntimeError(f"Ingestion failed for: {', '.join(errors)}")
 
-    logger.info("ingestion_end", source="geo")
+    logger.info("ingestion_end")
 
 
 if __name__ == "__main__":
-    run()
+    import sys
+
+    try:
+        run()
+    except Exception:
+        sys.exit(1)

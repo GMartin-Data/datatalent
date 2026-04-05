@@ -44,7 +44,11 @@ def run():
 
         for code in CODES_ROME:
             for dept in DEPARTEMENTS:
-                logger.info("ingestion_start", code_rome=code, departement=dept)
+                logger.info(
+                    "ingestion_start",
+                    code_rome=code,
+                    departement=dept,
+                )
                 try:
                     offres = client.fetch_offres(code, dept)
                 except httpx.HTTPStatusError as e:
@@ -60,7 +64,11 @@ def run():
                 raw_offres.extend(offres)
 
         unique_offres = deduplicate_offres(raw_offres)
-        logger.info("dedup_complete", raw=len(raw_offres), unique=len(unique_offres))
+        logger.info(
+            "dedup_complete",
+            raw=len(raw_offres),
+            unique=len(unique_offres),
+        )
 
         today = str(datetime.date.today())
         for offre in unique_offres:
@@ -70,7 +78,11 @@ def run():
         file_path = os.path.join(OUTPUT_DIR, filename)
 
         write_jsonl(unique_offres, file_path)
-        logger.info("file_written", path=file_path, count=len(unique_offres))
+        logger.info(
+            "file_written",
+            path=file_path,
+            count=len(unique_offres),
+        )
 
     # Upload vers GCS
     gcs_uri = upload_to_gcs(file_path, "france_travail")
@@ -86,6 +98,14 @@ def run():
     )
     logger.info("bq_load_complete", table="raw.france_travail")
 
+    logger.info("ingestion_end")
+
 
 if __name__ == "__main__":
-    run()
+    import sys
+
+    try:
+        run()
+    except Exception as exc:
+        logger.exception("ingestion_failed", error=str(exc))
+        sys.exit(1)

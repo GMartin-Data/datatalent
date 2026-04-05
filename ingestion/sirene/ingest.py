@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import sys
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -367,19 +366,19 @@ def run() -> list[str]:
     configure_logging()
     ensure_directories()
 
-    logger.info("sirene.ingestion_started")
+    logger.info("ingestion_started")
 
     try:
         age_days = _most_recent_blob_age_days()
         if age_days is not None and age_days < SKIP_IF_RECENT_DAYS:
             logger.info(
-                "sirene.skip_recent",
+                "skip_recent",
                 age_days=age_days,
                 threshold_days=SKIP_IF_RECENT_DAYS,
             )
             return []
     except Exception:
-        logger.warning("sirene.skip_check_failed", exc_info=True)
+        logger.warning("skip_check_failed", exc_info=True)
 
     dataset_metadata = fetch_dataset_metadata()
 
@@ -389,13 +388,15 @@ def run() -> list[str]:
             process_one_resource(logical_name, resource_cfg, dataset_metadata)
         )
 
-    logger.info("sirene.ingestion_succeeded", resource_count=len(outputs))
+    logger.info("ingestion_succeeded", resource_count=len(outputs))
     return outputs
 
 
 if __name__ == "__main__":
+    import sys
+
     try:
         run()
     except Exception as exc:
-        logger.exception("sirene.ingestion_failed", error=str(exc))
+        logger.exception("ingestion_failed", error=str(exc))
         sys.exit(1)

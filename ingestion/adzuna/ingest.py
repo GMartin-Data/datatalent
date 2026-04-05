@@ -66,25 +66,25 @@ def run() -> None:
     Séquence : credentials → API paginée → mapping colonnes →
     JSONL local → GCS → BigQuery (WRITE_APPEND).
     """
-    logger.info("adzuna.start")
+    logger.info("ingestion_start")
 
     app_id, app_key = get_credentials()
 
     raw_offers = fetch_all_offers(app_id, app_key)
-    logger.info("adzuna.offers_fetched", count=len(raw_offers))
+    logger.info("ingestion_fetched", count=len(raw_offers))
 
     mapped_offers = [_map_offer(offer) for offer in raw_offers]
-    logger.info("adzuna.offers_mapped", count=len(mapped_offers))
+    logger.info("offers_mapped", count=len(mapped_offers))
 
     today = str(date.today())
     for offer in mapped_offers:
         offer["_ingestion_date"] = today
 
     _write_jsonl(mapped_offers, LOCAL_JSONL_PATH)
-    logger.info("adzuna.jsonl_written", path=LOCAL_JSONL_PATH)
+    logger.info("jsonl_written", path=LOCAL_JSONL_PATH)
 
     gcs_uri = upload_to_gcs(LOCAL_JSONL_PATH, GCS_PREFIX)
-    logger.info("adzuna.gcs_uploaded", uri=gcs_uri)
+    logger.info("gcs_uploaded", uri=gcs_uri)
 
     load_gcs_to_bq(
         gcs_uri,
@@ -93,4 +93,14 @@ def run() -> None:
         write_disposition="WRITE_APPEND",
         time_partitioning=bigquery.TimePartitioning(field="_ingestion_date"),
     )
-    logger.info("adzuna.done", count=len(mapped_offers))
+    logger.info("ingestion_end", count=len(mapped_offers))
+
+
+if __name__ == "__main__":
+    import sys
+
+    try:
+        run()
+    except Exception as exc:
+        logger.exception("ingestion_failed", error=str(exc))
+        sys.exit(1)
