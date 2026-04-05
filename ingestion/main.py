@@ -1,10 +1,12 @@
 """Sequential entrypoint for the DataTalent ingestion pipeline.
 
-Runs all source ingestions in order.
+Runs all source ingestions in order with best-effort error handling.
+Each source runs independently - A failure in one does not block the others.
 Designed to be executed as a Cloud Run job via `python main.py`.
 """
 
 import sys
+from collections.abc import Callable
 
 from adzuna.ingest import run as run_adzuna
 from bmo.ingest import run as run_bmo
@@ -17,25 +19,39 @@ from urssaf_masse_salariale.ingest import run as run_urssaf_masse_salariale
 
 logger = get_logger(__name__)
 
+SOURCES: list[tuple[str, Callable]] = [
+    ("france_travail", run_france_travail),
+    ("sirene", run_sirene),
+    ("adzuna", run_adzuna),
+    ("urssaf_effectifs", run_urssaf_effectifs),
+    ("urssaf_masse_salariale", run_urssaf_masse_salariale),
+    ("bmo", run_bmo),
+    ("geo", run_geo),
+]
+
 
 def main() -> None:
-    """Run all ingestion sources sequentially.
+    """Run all ingestion sources sequentially (best-effort).
 
-    If any source fails, logs the error and exits with code 1.
-    Cloud Run Job interprets a non-zero exit as a failed execution.
+    Each source has its own try/except - a failure is logged but does
+    not prevent the remaining sources from running.
+    Exit code 1 if at least one source failed.
     """
-    logger.info("ingestion_start")
+    logger.info("ingestion_start", sources=[name for name, _ in SOURCES])
 
-    try:
-        run_france_travail()
-        run_sirene()
-        run_adzuna()
-        run_urssaf_effectifs()
-        run_urssaf_masse_salariale()
-        run_bmo()
-        run_geo()
-    except Exception:
-        logger.exception("ingestion_failed")
+    errors: list[str] = []
+
+    for name, run_fn in SOURCES:
+        try:
+            logger.info("source_start", source=name)
+            run_fn()
+            logger.info("source_end", source=name)
+        except Exception as exc:
+            logger.exception("source_failed", source=name, error=str(exc))
+            errors.append(name)
+
+    if errors:
+        logger.error("ingestion_partial_failure", failed=errors)
         sys.exit(1)
 
     logger.info("ingestion_end")
