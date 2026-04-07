@@ -1,3 +1,12 @@
+# CI — GitHub Actions
+# Déclenché sur chaque PR vers main.
+#
+# Jobs : lint Python (ruff + pytest), dbt compile.
+# TODO : ajouter dbt test (après création sa-dbt) et terraform validate.
+#
+# Le CI ne remplace PAS les vérifications locales dbt :
+#   cd dbt && uv run dbt build --select <modèle>
+
 name: CI
 
 on:
@@ -27,3 +36,31 @@ jobs:
       - uses: astral-sh/setup-uv@v4
       - run: uv sync --group dev
       - run: uv run pytest -v
+
+  dbt-validate:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dbt
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+      - uses: astral-sh/setup-uv@v4
+      - run: uv sync --frozen
+      - run: |
+          cat > profiles.yml << EOF
+          datatalent:
+            target: ci
+            outputs:
+              ci:
+                type: bigquery
+                method: oauth
+                project: ${{ secrets.GCP_PROJECT_ID }}
+                dataset: staging
+                location: ${{ secrets.GCP_REGION }}
+                threads: 4
+          EOF
+      - run: uv run dbt deps
+      - run: uv run dbt compile
