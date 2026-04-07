@@ -17,7 +17,6 @@ dbt/.user.yml
 infra/terraform.tfvars
 infra/.terraform/
 infra/*.tfstate*
-infra/.terraform.lock.hcl
 
 # IDE
 .vscode/
