@@ -2,37 +2,40 @@
 
 ## Prérequis
 
+- [Google Cloud SDK](https://cloud.google.com/sdk/docs/install) — voir `docs/onboarding-gcp.md` pour l'installation et l'authentification (ADC)
 - [uv](https://docs.astral.sh/uv/) (gère Python + dépendances)
-  ```bash
+```bash
   # Linux / macOS
   curl -LsSf https://astral.sh/uv/install.sh | sh
   # Windows
   powershell -ExecutionPolicy BypassProcess -c "irm https://astral.sh/uv/install.ps1 | iex"
-  ```
+```
 - pre-commit
-  ```bash
+```bash
   uv tool install pre-commit
-  ```
+```
 - Git
 - Docker + Docker Compose
 
 ## Installation
-
 ```bash
 # 1. Clone
 git clone git@github.com:GMartin-Data/datatalent.git && cd datatalent
 
-# 2. Dépendances Python (uv installe Python 3.12 automatiquement si absent)
+# 2. Dépendances ingestion
 cd ingestion && uv sync && cd ..
 
-# 3. Hooks pre-commit (les deux commandes sont nécessaires)
+# 3. Dépendances dbt
+cd dbt && uv sync && uv run dbt deps && cd ..
+
+# 4. Hooks pre-commit
 pre-commit install
 
-# 4. Fichiers locaux (ne seront jamais committés)
+# 5. Fichiers locaux (ne seront jamais committés)
 cp dbt/profiles.yml.example dbt/profiles.yml
 cp infra/terraform.tfvars.example infra/terraform.tfvars
 
-# 5. Variables d'environnement
+# 6. Variables d'environnement
 cp .env.example .env
 ```
 
@@ -45,21 +48,23 @@ Les autres sources (Sirene, Géo, URSSAF ×2, BMO) sont publiques et n'ont pas b
 Ouvrir `dbt/profiles.yml` et `infra/terraform.tfvars`, remplacer `<YOUR_GCP_PROJECT_ID>` par votre project ID GCP.
 
 ## Vérification
-
 ```bash
 # Pre-commit fonctionne
 pre-commit run --all-files
 
 # Python fonctionne
 cd ingestion && uv run python -c "import httpx; print('OK')" && cd ..
+
+# dbt compile
+cd dbt && uv run dbt compile && cd ..
 ```
 
 ## Conventions à connaître
 
 ### Git
 
-- Messages de commit : [Conventional Commits](https://www.conventionalcommits.org/) — validé automatiquement par un hook
-- Branches : `{type}/{scope}` (ex: `feat/ingestion-france-travail`)
+- Messages de commit : [Conventional Commits](https://www.conventionalcommits.org/) en anglais — validé automatiquement par un hook
+- Branches : `{type}/{scope}` (ex: `feature/ingestion-france-travail`)
 - Merge : squash merge sur `main` via PR avec 1 approval minimum
 
 ### Python
@@ -67,6 +72,12 @@ cd ingestion && uv run python -c "import httpx; print('OK')" && cd ..
 - Linting et formatting par Ruff — exécuté automatiquement à chaque commit
 - Config partagée : `ruff.toml` à la racine
 - Dépendances : `ingestion/pyproject.toml` — ajouter via `uv add`, jamais manuellement
+
+### dbt
+
+- Environnement Python isolé : `dbt/pyproject.toml`
+- Dépendances dbt : `dbt/packages.yml` (lock : `dbt/package-lock.yml`)
+- Profil : `dbt/profiles.yml` (gitignored, copié depuis `profiles.yml.example`)
 
 ### Fichiers sensibles
 
@@ -76,8 +87,12 @@ Ne jamais committer : `.env`, `dbt/profiles.yml`, `infra/terraform.tfvars`. Le `
 
 | Action | Commande |
 |--------|----------|
-| Ajouter une dépendance | `cd ingestion && uv add <package>` |
-| Lancer les tests | `cd ingestion && uv run pytest` |
+| Ajouter une dépendance ingestion | `cd ingestion && uv add <package>` |
+| Ajouter une dépendance dbt | `cd dbt && uv add <package>` |
+| Lancer les tests Python | `cd ingestion && uv run pytest` |
+| Compiler dbt | `cd dbt && uv run dbt compile` |
+| Tester dbt | `cd dbt && uv run dbt test` |
+| Lancer un modèle dbt | `cd dbt && uv run dbt run -s <model>` |
 | Linter manuellement | `ruff check .` |
 | Formater manuellement | `ruff format .` |
 | Build Docker local | `docker compose build ingestion` |
