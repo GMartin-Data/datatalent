@@ -4,4 +4,3 @@
 
 project_id = "<YOUR_GCP_PROJECT_ID>"
 region     = "europe-west1"
-zone       = "europe-west1-b"
