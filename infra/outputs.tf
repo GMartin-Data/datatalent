@@ -17,3 +17,9 @@ output "sa_dbt_email" {
   description = "Email of the dbt service account"
   value       = google_service_account.sa_dbt.email
 }
+
+output "artifact_registry_repository" {
+  description = "Full path of the Artifact Registry repository"
+  # Usage: {region}-docker.pkg.dev/{project_id}/{repository_id}/{image_name}:{tag}
+  value = "${google_artifact_registry_repository.docker.location}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.docker.repository_id}"
+}
