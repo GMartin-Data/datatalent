@@ -76,3 +76,18 @@ resource "google_artifact_registry_repository" "docker" {
   # Ensure the API is enabled before creating the repository
   depends_on = [google_project_service.apis]
 }
+
+module "secret_manager" {
+  source = "./modules/secret_manager"
+
+  project_id   = var.project_id
+  secret_names = ["ft-client-id", "ft-client-secret", "adzuna-app-id", "adzuna-app-key"]
+  secret_values = {
+    "ft-client-id"     = var.ft_client_id
+    "ft-client-secret" = var.ft_client_secret
+    "adzuna-app-id"    = var.adzuna_app_id
+    "adzuna-app-key"   = var.adzuna_app_key
+  }
+
+  depends_on = [google_project_service.apis]
+}
