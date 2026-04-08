@@ -57,10 +57,22 @@ resource "google_project_service" "apis" {
     "storage.googleapis.com",
     "bigquery.googleapis.com",
     "secretmanager.googleapis.com",
+    "artifactregistry.googleapis.com",
   ])
 
   project = var.project_id
   service = each.value
 
   disable_on_destroy = false
+}
+
+resource "google_artifact_registry_repository" "docker" {
+  project = var.project_id
+  location = var.region
+  repository_id = "datatalent"
+  format = "DOCKER"
+  description = "Docker images for Datatalent pipelines"
+
+  # Ensure the API is enabled before creating the repository
+  depends_on = [google_project_service.apis]
 }
