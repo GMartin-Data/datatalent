@@ -12,3 +12,8 @@ output "service_account_email" {
   description = "Email of the ingestion service account"
   value       = module.iam.service_account_email
 }
+
+output "sa_dbt_email" {
+  description = "Email of the dbt service account"
+  value       = google_service_account.sa_dbt.email
+}
