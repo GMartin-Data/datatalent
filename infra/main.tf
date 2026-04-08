@@ -17,7 +17,7 @@ module "bigquery" {
 module "iam" {
   source = "./modules/iam"
 
-  project_id = var.project_id
+  project_id         = var.project_id
   service_account_id = "sa-ingestion"
   iam_members = [
     "serviceAccount:sa-ingestion@${var.project_id}.iam.gserviceaccount.com",
@@ -35,8 +35,8 @@ module "iam" {
 }
 
 resource "google_service_account" "sa_dbt" {
-  project = var.project_id
-  account_id = "sa-dbt"
+  project      = var.project_id
+  account_id   = "sa-dbt"
   display_name = "Service Account dbt"
 }
 
@@ -67,11 +67,11 @@ resource "google_project_service" "apis" {
 }
 
 resource "google_artifact_registry_repository" "docker" {
-  project = var.project_id
-  location = var.region
+  project       = var.project_id
+  location      = var.region
   repository_id = "datatalent"
-  format = "DOCKER"
-  description = "Docker images for Datatalent pipelines"
+  format        = "DOCKER"
+  description   = "Docker images for Datatalent pipelines"
 
   # Ensure the API is enabled before creating the repository
   depends_on = [google_project_service.apis]
