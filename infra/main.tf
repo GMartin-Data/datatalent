@@ -34,6 +34,24 @@ module "iam" {
   ]
 }
 
+resource "google_service_account" "sa_dbt" {
+  project = var.project_id
+  account_id = "sa-dbt"
+  display_name = "Service Account dbt"
+}
+
+resource "google_project_iam_member" "sa_dbt" {
+  for_each = toset([
+    "roles/bigquery.dataEditor",
+    "roles/bigquery.jobUser",
+  ])
+
+  project = var.project_id
+  role    = each.value
+  # Computed attribute: resolved by the provider from account_id + project
+  member = "serviceAccount:${google_service_account.sa_dbt.email}"
+}
+
 resource "google_project_service" "apis" {
   for_each = toset([
     "storage.googleapis.com",
