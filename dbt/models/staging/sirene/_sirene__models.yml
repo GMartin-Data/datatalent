@@ -2,4 +2,84 @@ version: 2
 
 models:
   - name: stg_sirene__etablissements
-    description: Établissements actifs INSEE (~17M), livrable technique seul (D14-bis).
+    description: >
+      Stock des établissements actifs issus du répertoire Sirene (INSEE, data.gouv.fr).
+      ~17M lignes après filtre etatAdministratifEtablissement = 'A' (sur ~43M en raw).
+      Livrable technique — aucune table intermediate ne consomme ce modèle.
+      Parquet brut chargé en raw, renommage camelCase → snake_case en staging.
+      StockUniteLegale reste en raw sans staging à ce stade.
+
+    columns:
+      - name: siret
+        description: Identifiant SIRET de l'établissement (14 chiffres). Clé naturelle.
+        data_tests:
+          - unique
+          - not_null
+
+      - name: siren
+        description: Identifiant SIREN de l'entreprise (9 premiers chiffres du SIRET).
+        data_tests:
+          - not_null
+
+      - name: denomination_usuelle
+        description: Nom d'usage de l'établissement.
+
+      - name: enseigne
+        description: Enseigne commerciale de l'établissement.
+
+      - name: code_naf
+        description: >
+          Code APE/NAF de l'activité principale (format INSEE avec point, ex. 62.01Z).
+        data_tests:
+          - not_null
+
+      - name: tranche_effectifs
+        description: Tranche d'effectifs salariés INSEE.
+
+      - name: code_commune
+        description: >
+          Code INSEE de la commune. Couverture incomplète possible selon la source.
+        data_tests:
+          - not_null:
+              config:
+                severity: warn
+
+      - name: code_postal
+        description: Code postal de l'établissement.
+
+      - name: libelle_commune
+        description: Nom de la commune selon l'INSEE.
+
+      - name: date_creation
+        description: Date de création de l'établissement.
+
+      - name: is_siege
+        description: TRUE si l'établissement est le siège social de l'entreprise.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [true, false]
+                quote: false
+
+      - name: is_diffusion_partielle
+        description: >
+          TRUE si l'établissement a demandé une diffusion partielle.
+          Les colonnes d'adresse détaillée sont exclues du staging.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [true, false]
+                quote: false
+
+      - name: is_employeur
+        description: TRUE si l'établissement est déclaré employeur auprès de l'INSEE.
+        data_tests:
+          - not_null:
+              config:
+                severity: warn
+          - accepted_values:
+              arguments:
+                values: [true, false]
+                quote: false
