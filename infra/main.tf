@@ -45,6 +45,7 @@ module "iam" {
     "bigquery.dataEditor",
     "bigquery.jobUser",
     "secretmanager.secretAccessor",
+    "serviceusage.serviceUsageConsumer",
   ]
 }
 
