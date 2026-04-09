@@ -58,6 +58,8 @@ resource "google_project_service" "apis" {
     "bigquery.googleapis.com",
     "secretmanager.googleapis.com",
     "artifactregistry.googleapis.com",
+    "run.googleapis.com",
+    "cloudscheduler.googleapis.com",
   ])
 
   project = var.project_id
@@ -87,6 +89,26 @@ module "secret_manager" {
     "ft-client-secret" = var.ft_client_secret
     "adzuna-app-id"    = var.adzuna_app_id
     "adzuna-app-key"   = var.adzuna_app_key
+  }
+
+  depends_on = [google_project_service.apis]
+}
+
+module "cloud_run" {
+  source = "./modules/cloud_run"
+
+  project_id            = var.project_id
+  region                = var.region
+  job_name              = "datatalent-ingestion"
+  image                 = "${google_artifact_registry_repository.docker.location}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.docker.repository_id}/ingestion:initial"
+  service_account_email = module.iam.service_account_email
+  schedule              = "0 6 * * 1"
+
+  secret_env_vars = {
+    FT_CLIENT_ID     = module.secret_manager.secret_ids["ft-client-id"]
+    FT_CLIENT_SECRET = module.secret_manager.secret_ids["ft-client-secret"]
+    ADZUNA_APP_ID    = module.secret_manager.secret_ids["adzuna-app-id"]
+    ADZUNA_APP_KEY   = module.secret_manager.secret_ids["adzuna-app-key"]
   }
 
   depends_on = [google_project_service.apis]
