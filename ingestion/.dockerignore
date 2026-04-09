@@ -7,3 +7,7 @@ __pycache__/
 tests/
 .env
 Dockerfile
+*.parquet
+*.jsonl
+*.xlsx
+*.csv
