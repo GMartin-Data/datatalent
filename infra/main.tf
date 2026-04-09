@@ -70,7 +70,8 @@ resource "google_project_iam_member" "sa_dbt" {
 resource "google_project_iam_member" "sa_ingestion_ci_cd" {
   for_each = toset([
     "roles/artifactregistry.writer", # push des images Docker
-    "roles/run.developer",           # # gcloud run jobs update
+    "roles/run.developer",           # gcloud run jobs update
+    "roles/iam.serviceAccountUser",  # actAs sa-ingestion pour Cloud Run
   ])
 
   project = var.project_id
