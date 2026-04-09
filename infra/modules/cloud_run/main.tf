@@ -47,6 +47,17 @@ resource "google_cloud_run_v2_job" "this" {
       }
     }
   }
+
+  # L'image est mise à jour par la CI/CD (deploy.yml) à chaque merge sur main.
+  # client/client_version sont des métadonnées injectées par gcloud.
+  # Terraform ne doit pas les réverter.
+  lifecycle {
+    ignore_changes = [
+      template[0].template[0].containers[0].image,
+      client,
+      client_version,
+    ]
+  }
 }
 
 # --- 2. IAM : autoriser sa-ingestion à déclencher ce job ---
