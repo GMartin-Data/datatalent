@@ -17,6 +17,7 @@ dbt/.user.yml
 infra/terraform.tfvars
 infra/.terraform/
 infra/*.tfstate*
+infra/logs/
 
 # IDE
 .vscode/
