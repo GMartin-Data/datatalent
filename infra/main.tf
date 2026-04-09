@@ -52,6 +52,17 @@ resource "google_project_iam_member" "sa_dbt" {
   member = "serviceAccount:${google_service_account.sa_dbt.email}"
 }
 
+resource "google_project_iam_member" "sa_ingestion_ci_cd" {
+  for_each = toset([
+    "roles/artifactregistry.writer",
+    "roles/run.developer",
+  ])
+
+  project = var.project_id
+  role    = each.value
+  member  = "serviceAccount:${module.iam.service_account_email}"
+}
+
 resource "google_project_service" "apis" {
   for_each = toset([
     "storage.googleapis.com",
