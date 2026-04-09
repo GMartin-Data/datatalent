@@ -7,6 +7,7 @@ models:
       Modèle de staging mono-source dédupliqué par offre_id via _ingestion_date.
       Aucune ligne n'est filtrée à ce stade : les colonnes de classification et de flag
       permettent le tri en intermediate.
+
     columns:
       - name: offre_id
         description: Identifiant unique Adzuna, casté en STRING pour harmonisation aval.
@@ -43,7 +44,14 @@ models:
           - not_null
           - accepted_values:
               arguments:
-                values: ['data_engineer', 'data_analyst', 'data_architect', 'bi_decisionnel', 'ml_engineer', 'data_scientist', 'autre_it']
+                values:
+                  - 'data_engineer'
+                  - 'data_analyst'
+                  - 'data_architect'
+                  - 'bi_decisionnel'
+                  - 'ml_engineer'
+                  - 'data_scientist'
+                  - 'autre_it'
 
       - name: is_metier_data
         description: TRUE si categorie_metier est différente de 'autre_it'.
@@ -92,6 +100,26 @@ models:
 
       - name: salaire_est_estime
         description: Indicateur source Adzuna de salaire estimé ou non.
+
+      - name: salaire_periodicite_inferree
+        description: >
+          Périodicité de salaire inférée de façon prudente à partir de l'ordre de grandeur du montant Adzuna.
+          Valeurs possibles : annuel, mensuel, sinon NULL.
+
+      - name: is_salaire_periodicite_inferree
+        description: TRUE si une périodicité salaire a pu être inférée de façon prudente.
+
+      - name: salaire_annuel_min
+        description: >
+          Salaire minimum annualisé à partir de la périodicité inférée.
+          Égal au salaire brut si la périodicité est inférée comme annuelle,
+          ou salaire mensuel * 12 si elle est inférée comme mensuelle.
+
+      - name: salaire_annuel_max
+        description: >
+          Salaire maximum annualisé à partir de la périodicité inférée.
+          Égal au salaire brut si la périodicité est inférée comme annuelle,
+          ou salaire mensuel * 12 si elle est inférée comme mensuelle.
 
       - name: type_contrat
         description: Type de contrat remonté par Adzuna.

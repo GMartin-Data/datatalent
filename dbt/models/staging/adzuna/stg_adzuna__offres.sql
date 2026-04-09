@@ -7,13 +7,14 @@
 -- 1. Dédupliquer les offres Adzuna par offre_id
 -- 2. Conserver la version la plus récente selon _ingestion_date
 -- 3. Normaliser les types et calculer les colonnes utiles
--- 4. Classifier les intitulés de poste
--- 5. Ajouter les flags métiers et salaire
+-- 4. Enrichir les salaires avec une périodicité inférée
+-- 5. Classifier les intitulés de poste
+-- 6. Ajouter les flags métiers et conserver les colonnes salaire
 --
 -- Remarque :
 -- Les REGEX ci-dessous sont provisoires.
 -- Elles devront être alignées strictement avec France Travail
--- dès que tu me transmettras la version finale.
+-- dès que la version finale commune sera validée.
 -- ============================================================
 
 with source_raw as (
@@ -52,7 +53,7 @@ source_typed as (
     -- Ce bloc gère :
     -- - l'harmonisation de offre_id en STRING
     -- - les colonnes de géolocalisation
-    -- - les colonnes salaire
+    -- - les colonnes salaire brutes
     -- - la normalisation du titre pour les REGEX
     -- ========================================================
     select
@@ -84,7 +85,7 @@ source_typed as (
         cast(longitude as float64) as longitude,
 
         -- -------------------------------
-        -- Salaire
+        -- Salaire brut Adzuna
         -- -------------------------------
         cast(salaire_min as float64) as salaire_min,
         cast(salaire_max as float64) as salaire_max,
@@ -114,70 +115,109 @@ source_typed as (
 
 ),
 
+salary_enriched as (
+
+    -- ========================================================
+    -- Étape 4 : inférence prudente de la périodicité salaire
+    --
+    -- Règles retenues :
+    -- - annuel : entre 15k et 250k
+    -- - mensuel : entre 1k et 14 999
+    -- - sinon : NULL
+    --
+    -- On n'infère pas l'horaire ici car trop ambigu pour Adzuna.
+    -- ========================================================
+    select
+        *,
+
+        case
+            when coalesce(salaire_min, salaire_max) between 15000 and 250000 then 'annuel'
+            when coalesce(salaire_min, salaire_max) between 1000 and 14999 then 'mensuel'
+            else null
+        end as salaire_periodicite_inferree,
+
+        case
+            when coalesce(salaire_min, salaire_max) between 15000 and 250000 then true
+            when coalesce(salaire_min, salaire_max) between 1000 and 14999 then true
+            else false
+        end as is_salaire_periodicite_inferree,
+
+        case
+            when coalesce(salaire_min, salaire_max) between 15000 and 250000 then salaire_min
+            when coalesce(salaire_min, salaire_max) between 1000 and 14999 then salaire_min * 12
+            else null
+        end as salaire_annuel_min,
+
+        case
+            when coalesce(salaire_min, salaire_max) between 15000 and 250000 then coalesce(salaire_max, salaire_min)
+            when coalesce(salaire_min, salaire_max) between 1000 and 14999 then coalesce(salaire_max, salaire_min) * 12
+            else null
+        end as salaire_annuel_max
+
+    from source_typed
+
+),
+
 classified as (
 
     -- ========================================================
-    -- Étape 4 : classification métier à partir du titre
+    -- Étape 5 : classification métier à partir du titre
     --
-    -- Cette version est provisoire.
-    -- Elle sera remplacée par la logique exacte de France Travail
-    -- pour garantir une parfaite cohérence inter-sources.
+    -- Version alignée au maximum avec France Travail
+    -- + cas spécifiques observés dans Adzuna
     -- ========================================================
     select
         *,
         case
             -- ---------------------------
             -- Data Engineer
-            -- variantes anglaises + françaises
-            -- + cas spécifiques observés dans Adzuna
+            -- aligné FT + cas spécifiques
+            -- observés dans Adzuna
             -- ---------------------------
-            when regexp_contains(titre_normalise, r'\bdata\s*engineer\b')
-                 or regexp_contains(titre_normalise, r'\bbig\s*data\s*engineer\b')
-                 or regexp_contains(titre_normalise, r'\bcloud\s*data\s*engineer\b')
-                 or regexp_contains(titre_normalise, r'\bdata\s*platform\s*engineer\b')
-                 or regexp_contains(titre_normalise, r'\bing[eé]nieur\s*data\b')
-                 or regexp_contains(titre_normalise, r'\bing[eé]nieur\s*de\s*donn[ée]es\b')
-                 or regexp_contains(titre_normalise, r'\bing[eé]nieur\s*des\s*donn[ée]es\b')
-                 or regexp_contains(titre_normalise, r'\bdceo\s*engineer\b')
-                 or regexp_contains(titre_normalise, r'\bdata\s*cent(er|re)\s*engineering\s*operations\b')
-            then 'data_engineer'
+            when regexp_contains(
+                titre_normalise,
+                r'data\s+engineer|ing[eé]nieur\s+data|d[eé]veloppeur\s+data|data\s+engineering|ing[eé]nieur\s+de\s+donn[ée]es|data\s+ing[eé]nieur|dceo\s+engineer|data\s+cent(er|re)\s+engineering\s+operations'
+            ) then 'data_engineer'
 
             -- ---------------------------
             -- Data Architect
             -- ---------------------------
-            when regexp_contains(titre_normalise, r'\bdata\s*architect\b')
-                 or regexp_contains(titre_normalise, r'\barchitecte\s*data\b')
-                 or regexp_contains(titre_normalise, r'\barchitecte\s*de\s*donn[ée]es\b')
-            then 'data_architect'
-
-            -- ---------------------------
-            -- ML Engineer
-            -- ---------------------------
-            when regexp_contains(titre_normalise, r'\b(machine\s*learning|ml)\s*engineer\b')
-                 or regexp_contains(titre_normalise, r'\bing[eé]nieur\s*(machine\s*learning|ml)\b')
-            then 'ml_engineer'
-
-            -- ---------------------------
-            -- Data Scientist
-            -- ---------------------------
-            when regexp_contains(titre_normalise, r'\bdata\s*scientist\b')
-                 or regexp_contains(titre_normalise, r'\bscientist\s*data\b')
-            then 'data_scientist'
+            when regexp_contains(
+                titre_normalise,
+                r'architecte\s+data|data\s+architect|architecte\s+de\s+donn[ée]es'
+            ) then 'data_architect'
 
             -- ---------------------------
             -- Data Analyst
             -- ---------------------------
-            when regexp_contains(titre_normalise, r'\bdata\s*anal')
-                 or regexp_contains(titre_normalise, r'\banalyste\s*data\b')
-                 or regexp_contains(titre_normalise, r'\banalyste\s*de\s*donn[ée]es\b')
-            then 'data_analyst'
+            when regexp_contains(
+                titre_normalise,
+                r'data\s+analyst|analyste\s+data|business\s+data\s+analyst|data\s+product\s+analyst|analyste\s+de\s+donn[ée]es'
+            ) then 'data_analyst'
 
             -- ---------------------------
             -- BI / décisionnel
             -- ---------------------------
-            when regexp_contains(titre_normalise, r'\bbusiness\s*intelligence\b')
-                 or regexp_contains(titre_normalise, r'\bd[eé]cisionnel\b')
-            then 'bi_decisionnel'
+            when regexp_contains(
+                titre_normalise,
+                r'(?:d[eé]veloppeur|analyste|consultant|ing[eé]nieur)\s+(?:bi|d[eé]cisionnel|business\s+intelligence)|(?:bi|d[eé]cisionnel|business\s+intelligence)\s+(?:d[eé]veloppeur|analyste|consultant|ing[eé]nieur)|power\s*bi|d[eé]veloppeur\s+bi|\bbi\b\s+(?:analyst|developer)'
+            ) then 'bi_decisionnel'
+
+            -- ---------------------------
+            -- ML Engineer
+            -- ---------------------------
+            when regexp_contains(
+                titre_normalise,
+                r'mlops|ml\s+engineer|machine\s+learning\s+engineer|ing[eé]nieur\s+(machine\s+learning|ml)'
+            ) then 'ml_engineer'
+
+            -- ---------------------------
+            -- Data Scientist
+            -- ---------------------------
+            when regexp_contains(
+                titre_normalise,
+                r'data\s+scientist'
+            ) then 'data_scientist'
 
             -- ---------------------------
             -- Tous les autres cas
@@ -185,14 +225,15 @@ classified as (
             else 'autre_it'
         end as categorie_metier
 
-    from source_typed
+    from salary_enriched
 
 ),
 
 final as (
 
     -- ========================================================
-    -- 5. Ajouter les flags métiers et conserver les colonnes salaire
+    -- Étape 6 : ajout des flags métiers finaux
+    -- + conservation des colonnes salaire enrichies
     --
     -- Ce bloc ajoute :
     -- - is_metier_data
@@ -247,6 +288,10 @@ final as (
         salaire_max,
         source_salaire,
         salaire_est_estime,
+        salaire_periodicite_inferree,
+        is_salaire_periodicite_inferree,
+        salaire_annuel_min,
+        salaire_annuel_max,
 
         -- -------------------------------
         -- Contrat / catégorie
