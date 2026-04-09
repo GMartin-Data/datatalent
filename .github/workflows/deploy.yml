@@ -19,7 +19,7 @@ jobs:
 
       - uses: google-github-actions/auth@v2
         with:
-          credentials_json: ${{ secrets.GCP_SA_KEY_INGESTION }}
+          credentials_json: ${{ secrets.GCP_SA_INGESTION_KEY }}
 
       - name: Configure Docker for Artifact Registry
         run: gcloud auth configure-docker "${{ secrets.GCP_REGION }}-docker.pkg.dev" --quiet
