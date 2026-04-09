@@ -2,4 +2,108 @@ version: 2
 
 models:
   - name: stg_adzuna__offres
-    description: Offres data engineer Adzuna, déduplication ROW_NUMBER, source = 'adzuna'.
+    description: >
+      Offres d'emploi issues d'Adzuna.
+      Modèle de staging mono-source dédupliqué par offre_id via _ingestion_date.
+      Aucune ligne n'est filtrée à ce stade : les colonnes de classification et de flag
+      permettent le tri en intermediate.
+    columns:
+      - name: offre_id
+        description: Identifiant unique Adzuna, casté en STRING pour harmonisation aval.
+        data_tests:
+          - unique
+          - not_null
+
+      - name: titre
+        description: Intitulé de l'offre.
+        data_tests:
+          - not_null
+
+      - name: description
+        description: Description textuelle de l'offre.
+
+      - name: date_creation
+        description: Date de création de l'offre côté source.
+        data_tests:
+          - not_null
+
+      - name: source
+        description: Constante de traçabilité de la source.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['adzuna']
+
+      - name: categorie_metier
+        description: >
+          Catégorie métier dérivée du titre via regex.
+          Version provisoire à aligner strictement avec France Travail dès disponibilité des patterns finaux.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['data_engineer', 'data_analyst', 'data_architect', 'bi_decisionnel', 'ml_engineer', 'data_scientist', 'autre_it']
+
+      - name: is_metier_data
+        description: TRUE si categorie_metier est différente de 'autre_it'.
+        data_tests:
+          - not_null
+
+      - name: is_data_engineer
+        description: TRUE si le titre correspond à une offre de Data Engineer selon la regex métier.
+        data_tests:
+          - not_null
+
+      - name: entreprise_nom
+        description: Nom de l'entreprise.
+
+      - name: localisation_libelle
+        description: Libellé textuel de localisation.
+        data_tests:
+          - not_null
+
+      - name: region
+        description: Région extraite depuis localisation_area[1].
+
+      - name: departement_nom
+        description: Département textuel extrait depuis localisation_area[2].
+
+      - name: latitude
+        description: Latitude de l'offre.
+
+      - name: longitude
+        description: Longitude de l'offre.
+
+      - name: salaire_min
+        description: Salaire minimum déclaré par la source. L'unité ou la périodicité peut varier selon l'offre.
+
+      - name: salaire_max
+        description: Salaire maximum déclaré par la source. L'unité ou la périodicité peut varier selon l'offre.
+
+      - name: source_salaire
+        description: "'declare' si un salaire est présent, sinon NULL. Ne préjuge pas de l'unité du salaire."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['declare']
+              config:
+                where: "source_salaire IS NOT NULL"
+
+      - name: salaire_est_estime
+        description: Indicateur source Adzuna de salaire estimé ou non.
+
+      - name: type_contrat
+        description: Type de contrat remonté par Adzuna.
+
+      - name: temps_travail
+        description: Temps de travail remonté par Adzuna.
+
+      - name: categorie_tag
+        description: Catégorie Adzuna.
+
+      - name: categorie_libelle
+        description: Libellé de catégorie Adzuna.
+
+      - name: redirect_url
+        description: URL de redirection de l'offre.
