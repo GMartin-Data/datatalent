@@ -23,3 +23,13 @@ output "artifact_registry_repository" {
   # Usage: {region}-docker.pkg.dev/{project_id}/{repository_id}/{image_name}:{tag}
   value = "${google_artifact_registry_repository.docker.location}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.docker.repository_id}"
 }
+
+output "cloud_run_job_name" {
+  description = "Name of the ingestion Cloud Run Job"
+  value       = module.cloud_run.job_name
+}
+
+output "cloud_scheduler_name" {
+  description = "Name of the Cloud Scheduler Job"
+  value       = module.cloud_run.scheduler_name
+}

@@ -1,0 +1,45 @@
+# CD - GitHub Actions
+# Déclenché sur chaque merge dans main
+#
+# Jobs:
+# - build + push Docker image ingestion vers Artifact Registry
+# - update Cloud Run Job avec la nouvelle image
+
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_INGESTION_KEY }}
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker "${{ secrets.GCP_REGION }}-docker.pkg.dev" --quiet
+
+      - name: Build and push ingestion image
+        run: |
+          IMAGE="${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/datatalent/ingestion:${{ github.sha }}"
+          docker build -t "$IMAGE" ingestion/
+          docker push "$IMAGE"
+
+  deploy-job:
+    needs: build-push
+    runs-on: ubuntu-latest
+    steps:
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_INGESTION_KEY }}
+
+      - name: Update Cloud Run Job
+        run: |
+          gcloud run jobs update datatalent-ingestion \
+            --image="${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/datatalent/ingestion:${{ github.sha }}" \
+            --region="${{ secrets.GCP_REGION }}"
