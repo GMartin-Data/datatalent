@@ -2,8 +2,116 @@ version: 2
 
 models:
   - name: stg_geo__regions
-    description: Régions françaises, renommage camelCase → snake_case.
+    description: >
+      Référentiel des régions françaises (API Géo, geo.api.gouv.fr).
+      ~18 régions (métropole + DROM + COM). Données quasi-statiques,
+      dernier découpage régional = 2016.
+    columns:
+      - name: code
+        description: "Code région (ex: 32 = Hauts-de-France)"
+        data_tests:
+          - unique
+          - not_null
+      - name: nom
+        description: 'Nom de la région (ex: "Hauts-de-France")'
+        data_tests:
+          - not_null
+      - name: zone_geo
+        description: "Zone géographique : metro, drom, ou com"
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["metro", "drom", "com"]
+
   - name: stg_geo__departements
-    description: Départements français, renommage camelCase → snake_case.
+    description: >
+      Référentiel des départements français (API Géo). ~ 101 départements.
+      Dénormalisé avec nom_region via JOIN sur stg_geo__regions.
+    columns:
+      - name: code
+        description: "Code département (ex: 59 = Nord)"
+        data_tests:
+          - unique
+          - not_null
+      - name: nom
+        description: 'Nom du département (ex: "Nord")'
+        data_tests:
+          - not_null
+      - name: code_region
+        description: Code de la région parente
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_geo__regions')
+                field: code
+      - name: nom_region
+        description: Nom de la région parente (dénormalisé depuis stg_geo__regions)
+        data_tests:
+          - not_null
+      - name: zone_geo
+        description: "Zone géographique: metro, drom ou com"
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["metro", "drom", "com"]
   - name: stg_geo__communes
-    description: Communes françaises (~35 000), renommage camelCase → snake_case.
+    description: >-
+      Référentiel des communes françaises (API Géo). ~35 000 communes.
+      Clé de jointure principale avec les offres France Travail et Adzuna
+      (code INSEE commune). Dénormalisé avec nom_departement et nom_region.
+      Coordonnées extraites du champ GeoJSON centre (ordre lon/lat).
+    columns:
+      - name: code
+        description: "Code INSEE commune (ex: 59350 = Lille). Clé de jointure avec offres."
+        data_tests:
+          - unique
+          - not_null
+      - name: nom
+        description: 'Nom de la commune (ex: "Lille")'
+        data_tests:
+          - not_null
+      - name: code_departement
+        description: Code du département parent
+        data_tests:
+          - not_null:
+              config:
+                where: "code_departement NOT IN ('975', '977', '978', '984', '986', '987', '988', '989')"
+          - relationships:
+              arguments:
+                to: ref('stg_geo__departements')
+                field: code
+              config:
+                where: "code_departement NOT IN ('975', '977', '978', '984', '986', '987', '988', '989')"
+      - name: nom_departement
+        description: Nom du département parent (dénormalisé depuis stg_geo__departements)
+        data_tests:
+          - not_null:
+              config:
+                where: "code_departement NOT IN ('975', '977', '978', '984', '986', '987', '988', '989')"
+      - name: code_region
+        description: Code de la région parente
+        data_tests:
+          - not_null:
+              config:
+                where: "code_region NOT IN ('975', '977', '978', '984', '986', '987', '988', '989')"
+          - relationships:
+              arguments:
+                to: ref('stg_geo__regions')
+                field: code
+              config:
+                where: "code_region NOT IN ('975', '977', '978', '984', '986', '987', '988', '989')"
+      - name: nom_region
+        description: Nom de la région parente (dénormalisé depuis stg_geo__regions)
+        data_tests:
+          - not_null:
+              config:
+                where: "code_region NOT IN ('975', '977', '978', '984', '986', '987', '988', '989')"
+      - name: population
+        description: Population municipale (données census). Nullable pour certaines COM.
+      - name: centre_lat
+        description: Latitude du centre de la commune (extrait de centre.coordinates[1] GeoJSON)
+      - name: centre_lon
+        description: Longitude du centre de la commune (extrait de centre.coordinates[0] GeoJSON)
