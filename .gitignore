@@ -29,3 +29,6 @@ infra/logs/
 #Quentin    
 dataexplo.ipynb
 ingestion/sirene/data/
+
+# Ingestion
+ingestion/logs/
