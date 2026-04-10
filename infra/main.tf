@@ -155,3 +155,10 @@ module "cloud_run" {
 
   depends_on = [google_project_service.apis]
 }
+
+resource "google_bigquery_dataset" "billing_export" {
+  dataset_id = "billing_export"
+  location   = var.region
+
+  description = "GCP billing export - detailed usage cost data"
+}
