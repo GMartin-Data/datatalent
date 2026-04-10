@@ -47,7 +47,14 @@ Les autres sources (Sirene, Géo, URSSAF ×2, BMO) sont publiques et n'ont pas b
 
 Ouvrir `dbt/profiles.yml` et `infra/terraform.tfvars`, remplacer `<YOUR_GCP_PROJECT_ID>` par votre project ID GCP.
 
-m
+## Vérification
+```bash
+# Pre-commit fonctionne
+pre-commit run --all-files
+
+# Python fonctionne
+cd ingestion && uv run python -c "import httpx; print('OK')" && cd ..
+
 # dbt compile
 cd dbt && uv run dbt compile && cd ..
 ```

@@ -4,8 +4,9 @@ models:
   - name: stg_urssaf__effectifs_commune_ape
     description: >
       Effectifs salariés et établissements employeurs IT par commune × code APE × année
-      (2006–2024). 4 codes APE IT filtrés à l'ingestion (D37). Format long après unpivot.
-      ⚠ Paris = arrondissements 75101–75120, pas commune centrale 75056.
+      (2006–2024). Source : open.urssaf.fr, dataset Opendatasoft. 4 codes APE IT filtrés
+      à l'ingestion (D37). Format long après unpivot Python. Colonnes renommées à
+      l'ingestion (D39). ⚠ Paris = arrondissements 75101–75120, pas commune 75056.
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           combination_of_columns:
@@ -14,17 +15,22 @@ models:
             - annee
     columns:
       - name: code_commune
-        description: Code INSEE commune. ⚠ Paris = arrondissements 75101–75120.
+        description: >
+          Code INSEE commune. ⚠ Pour Paris, codes arrondissements (75101–75120),
+          pas code commune centrale (75056). Gestion en intermediate.
         data_tests:
           - not_null
       - name: intitule_commune
-        description: Champ composite URSSAF "code nom" (ex "94065 Rungis"). Non utilisé en aval.
+        description: >
+          Champ composite URSSAF "code nom" (ex: "94065 Rungis"). Redondant avec
+          code_commune + API Géo. Conservé par fidélité source, non utilisé en aval.
       - name: code_departement
         description: Code département
         data_tests:
           - not_null
       - name: code_ape
-        description: Code APE sans point (6201Z, 6202A, 6203Z, 6209Z)
+        description: >
+          Code APE sans point (6201Z, 6202A, 6203Z, 6209Z). Filtré à l'ingestion (D37).
         data_tests:
           - not_null
           - accepted_values:
@@ -34,11 +40,15 @@ models:
         data_tests:
           - not_null
       - name: nb_etablissements
-        description: Nombre d'établissements employeurs. COALESCE(raw, 0) appliqué.
+        description: >
+          Nombre d'établissements employeurs. COALESCE(raw, 0) appliqué en staging —
+          un 0 peut signifier "pas de donnée déclarée" si l'autre colonne avait une valeur.
         data_tests:
           - not_null
       - name: effectifs_salaries
-        description: Effectifs salariés en fin d'année. COALESCE(raw, 0) appliqué.
+        description: >
+          Effectifs salariés en fin d'année. COALESCE(raw, 0) appliqué en staging —
+          même caveat que nb_etablissements.
         data_tests:
           - not_null
 

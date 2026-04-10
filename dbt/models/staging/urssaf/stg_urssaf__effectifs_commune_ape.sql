@@ -10,6 +10,7 @@ WITH source AS (
     FROM {{ source('urssaf', 'urssaf_effectifs') }}
 )
 
+-- _ingestion_date exclue : métadonnée technique, pas de valeur analytique pour cette source (spec §2)
 SELECT
     code_commune,
     intitule_commune,
