@@ -2,4 +2,98 @@ version: 2
 
 models:
   - name: stg_sirene__etablissements
-    description: Établissements actifs INSEE (~17M), livrable technique seul (D14-bis).
+    description: >
+      Stock des établissements actifs issus du répertoire Sirene (INSEE, data.gouv.fr).
+      ~17M lignes après filtre etatAdministratifEtablissement = 'A' (sur ~43M en raw).
+      Livrable technique — aucune table intermediate ne consomme ce modèle (D14-bis, D50).
+      Parquet brut chargé en raw (D11), renommage camelCase → snake_case en staging.
+      StockUniteLegale (~29M lignes) reste en raw sans staging (jointure invalidée D14-bis, D50).
+
+    columns:
+      - name: siret
+        description: Identifiant SIRET de l'établissement (14 chiffres). Clé naturelle.
+        data_tests:
+          - unique
+          - not_null
+
+      - name: siren
+        description: >
+          Identifiant SIREN de l'entreprise (9 premiers chiffres du SIRET).
+          Lien vers StockUniteLegale en raw.
+        data_tests:
+          - not_null
+
+      - name: denomination_usuelle
+        description: >
+          Nom d'usage de l'établissement (20.9% non-null).
+          Distinct de la raison sociale (denominationUniteLegale, dans StockUniteLegale).
+
+      - name: enseigne
+        description: >
+          Enseigne commerciale (19.5% non-null).
+          Nom sous lequel l'activité est connue du public.
+
+      - name: code_naf
+        description: >
+          Code APE/NAF de l'activité principale (format INSEE avec point : 62.01Z).
+          Différent du format URSSAF effectifs (6201Z sans point).
+          Aucune jointure prévue entre les deux.
+        data_tests:
+          - not_null
+
+      - name: tranche_effectifs
+        description: >
+          Tranche d'effectifs salariés INSEE. Codes : NN (non employeur), 00 (0), 01 (1-2),
+          02 (3-5), 03 (6-9), 11 (10-19), 12 (20-49), 21 (50-99), 22 (100-199),
+          31 (200-249), 32 (250-499), 41 (500-999), 42 (1000-1999), 51 (2000-4999),
+          52 (5000-9999), 53 (≥10000).
+
+      - name: code_commune
+        description: >
+          Code INSEE de la commune (99.2% non-null).
+          Même référentiel que stg_geo__communes.code.
+        data_tests:
+          - not_null:
+              config:
+                severity: warn
+
+      - name: code_postal
+        description: Code postal de l'établissement.
+
+      - name: libelle_commune
+        description: Nom de la commune selon l'INSEE.
+
+      - name: date_creation
+        description: >
+          Date de création de l'établissement (type DATE natif depuis le Parquet).
+
+      - name: is_siege
+        description: TRUE si l'établissement est le siège social de l'entreprise.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [true, false]
+                quote: false
+
+      - name: is_diffusion_partielle
+        description: >
+          TRUE si l'établissement a demandé une diffusion partielle (RGPD).
+          Les colonnes d'adresse détaillée sont exclues du staging.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [true, false]
+                quote: false
+
+      - name: is_employeur
+        description: TRUE si l'établissement est déclaré employeur auprès de l'INSEE.
+        data_tests:
+          - not_null:
+              config:
+                severity: warn
+          - accepted_values:
+              arguments:
+                values: [true, false]
+                quote: false
