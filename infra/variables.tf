@@ -32,3 +32,9 @@ variable "adzuna_app_key" {
   type        = string
   sensitive   = true
 }
+
+variable "billing_account_id" {
+  description = "GCP billing account ID for budget alerts and billing export"
+  type        = string
+  sensitive   = true
+}
