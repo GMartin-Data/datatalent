@@ -1,7 +1,7 @@
 version: 2
 
 sources:
-  - name: adzuna
+  - name: raw
     database: "{{ env_var('DBT_PROJECT_ID', 'datatalent-glaq-2') }}"
     schema: raw
     tables:
