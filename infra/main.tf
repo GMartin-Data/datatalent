@@ -91,6 +91,8 @@ resource "google_project_service" "apis" {
     "run.googleapis.com",
     "cloudscheduler.googleapis.com",
     "cloudresourcemanager.googleapis.com",
+    "billingbudgets.googleapis.com",
+    "iam.googleapis.com",
   ])
 
   project = var.project_id
@@ -161,4 +163,37 @@ resource "google_bigquery_dataset" "billing_export" {
   location   = var.region
 
   description = "GCP billing export - detailed usage cost data"
+}
+
+resource "google_billing_budget" "project_budget" {
+  billing_account = var.billing_account_id
+  display_name    = "DataTalent - 10 EUR monthly budget"
+
+  budget_filter {
+    projects = ["projects/${var.project_id}"]
+  }
+
+  amount {
+    specified_amount {
+      currency_code = "EUR"
+      units         = "10"
+    }
+  }
+
+  threshold_rules {
+    threshold_percent = 0.5
+    spend_basis       = "CURRENT_SPEND"
+  }
+
+  threshold_rules {
+    threshold_percent = 0.9
+    spend_basis       = "CURRENT_SPEND"
+  }
+
+  threshold_rules {
+    threshold_percent = 1.0
+    spend_basis       = "CURRENT_SPEND"
+  }
+
+  depends_on = [google_project_service.apis]
 }
