@@ -8,3 +8,4 @@ datatalent:
       dataset: staging
       location: europe-west1
       threads: 4
+      maximum_bytes_billed: 10000000000

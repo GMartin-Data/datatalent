@@ -110,6 +110,18 @@ resource "google_artifact_registry_repository" "docker" {
   format        = "DOCKER"
   description   = "Docker images for Datatalent pipelines"
 
+  # Purge automatique des anciennes images Docker pour rester
+  # sous le free tier Artifact Registry (500 MB). Seules les 3
+  # dernières versions de chaque image sont conservées. Voir D69.
+  cleanup_policies {
+    id     = "keep-recent"
+    action = "KEEP"
+
+    most_recent_versions {
+      keep_count = 3
+    }
+  }
+
   # L'API doit être activée avant de créer le repository
   depends_on = [google_project_service.apis]
 }
