@@ -19,6 +19,190 @@ from .config import CODES_ROME, DEPARTEMENTS, OUTPUT_DIR
 
 logger = get_logger(__name__)
 
+FRANCE_TRAVAIL_SCHEMA = [
+    # — Identité & métadonnées —
+    bigquery.SchemaField("id", "STRING"),
+    bigquery.SchemaField("dateCreation", "TIMESTAMP"),
+    bigquery.SchemaField("dateActualisation", "TIMESTAMP"),
+    bigquery.SchemaField("intitule", "STRING"),
+    bigquery.SchemaField("description", "STRING"),
+    bigquery.SchemaField("romeCode", "STRING"),
+    bigquery.SchemaField("romeLibelle", "STRING"),
+    bigquery.SchemaField("appellationlibelle", "STRING"),
+    bigquery.SchemaField("natureContrat", "STRING"),
+    bigquery.SchemaField("typeContrat", "STRING"),
+    bigquery.SchemaField("typeContratLibelle", "STRING"),
+    bigquery.SchemaField("nombrePostes", "INTEGER"),
+    # — Expérience —
+    bigquery.SchemaField("experienceExige", "STRING"),
+    bigquery.SchemaField("experienceLibelle", "STRING"),
+    bigquery.SchemaField("experienceCommentaire", "STRING"),
+    # — Conditions de travail —
+    bigquery.SchemaField("alternance", "BOOLEAN"),
+    bigquery.SchemaField("dureeTravailLibelle", "STRING"),
+    bigquery.SchemaField("dureeTravailLibelleConverti", "STRING"),
+    bigquery.SchemaField("complementExercice", "STRING"),
+    bigquery.SchemaField("deplacementCode", "STRING"),  # ⚠ autodetect: INTEGER
+    bigquery.SchemaField("deplacementLibelle", "STRING"),
+    # — Qualification & secteur —
+    bigquery.SchemaField("qualificationCode", "STRING"),  # ⚠ autodetect: INTEGER
+    bigquery.SchemaField("qualificationLibelle", "STRING"),
+    bigquery.SchemaField("secteurActivite", "STRING"),  # ⚠ autodetect: INTEGER
+    bigquery.SchemaField("secteurActiviteLibelle", "STRING"),
+    bigquery.SchemaField("codeNAF", "STRING"),
+    bigquery.SchemaField("trancheEffectifEtab", "STRING"),
+    # — Accessibilité —
+    bigquery.SchemaField("accessibleTH", "BOOLEAN"),
+    bigquery.SchemaField("entrepriseAdaptee", "BOOLEAN"),
+    bigquery.SchemaField("employeurHandiEngage", "BOOLEAN"),
+    bigquery.SchemaField("offresManqueCandidats", "BOOLEAN"),
+    # — Lieu de travail —
+    bigquery.SchemaField(
+        "lieuTravail",
+        "RECORD",
+        fields=[
+            bigquery.SchemaField("libelle", "STRING"),
+            bigquery.SchemaField("commune", "STRING"),
+            bigquery.SchemaField("codePostal", "STRING"),  # ⚠ autodetect: INTEGER
+            bigquery.SchemaField("latitude", "FLOAT"),
+            bigquery.SchemaField("longitude", "FLOAT"),
+        ],
+    ),
+    # — Entreprise —
+    bigquery.SchemaField(
+        "entreprise",
+        "RECORD",
+        fields=[
+            bigquery.SchemaField("nom", "STRING"),
+            bigquery.SchemaField("url", "STRING"),
+            bigquery.SchemaField("logo", "STRING"),
+            bigquery.SchemaField("entrepriseAdaptee", "BOOLEAN"),
+            bigquery.SchemaField("description", "STRING"),
+        ],
+    ),
+    # — Salaire —
+    bigquery.SchemaField(
+        "salaire",
+        "RECORD",
+        fields=[
+            bigquery.SchemaField("libelle", "STRING"),
+            bigquery.SchemaField("commentaire", "STRING"),
+            bigquery.SchemaField("complement1", "STRING"),
+            bigquery.SchemaField("complement2", "STRING"),
+            bigquery.SchemaField(
+                "listeComplements",
+                "RECORD",
+                mode="REPEATED",
+                fields=[
+                    bigquery.SchemaField("libelle", "STRING"),
+                    bigquery.SchemaField("code", "STRING"),  # ⚠ autodetect: INTEGER
+                ],
+            ),
+        ],
+    ),
+    # — Contact —
+    bigquery.SchemaField(
+        "contact",
+        "RECORD",
+        fields=[
+            bigquery.SchemaField("nom", "STRING"),
+            bigquery.SchemaField("courriel", "STRING"),
+            bigquery.SchemaField("coordonnees1", "STRING"),
+            bigquery.SchemaField("coordonnees2", "STRING"),
+            bigquery.SchemaField("coordonnees3", "STRING"),
+            bigquery.SchemaField("urlPostulation", "STRING"),
+        ],
+    ),
+    # — Compétences, formations, langues, permis, qualités —
+    bigquery.SchemaField(
+        "competences",
+        "RECORD",
+        mode="REPEATED",
+        fields=[
+            bigquery.SchemaField("code", "STRING"),  # ⚠ autodetect: INTEGER
+            bigquery.SchemaField("exigence", "STRING"),
+            bigquery.SchemaField("libelle", "STRING"),
+        ],
+    ),
+    bigquery.SchemaField(
+        "formations",
+        "RECORD",
+        mode="REPEATED",
+        fields=[
+            bigquery.SchemaField("codeFormation", "STRING"),  # ⚠ autodetect: INTEGER
+            bigquery.SchemaField("commentaire", "STRING"),
+            bigquery.SchemaField("domaineLibelle", "STRING"),
+            bigquery.SchemaField("exigence", "STRING"),
+            bigquery.SchemaField("niveauLibelle", "STRING"),
+        ],
+    ),
+    bigquery.SchemaField(
+        "langues",
+        "RECORD",
+        mode="REPEATED",
+        fields=[
+            bigquery.SchemaField("exigence", "STRING"),
+            bigquery.SchemaField("libelle", "STRING"),
+        ],
+    ),
+    bigquery.SchemaField(
+        "permis",
+        "RECORD",
+        mode="REPEATED",
+        fields=[
+            bigquery.SchemaField("exigence", "STRING"),
+            bigquery.SchemaField("libelle", "STRING"),
+        ],
+    ),
+    bigquery.SchemaField(
+        "qualitesProfessionnelles",
+        "RECORD",
+        mode="REPEATED",
+        fields=[
+            bigquery.SchemaField("description", "STRING"),
+            bigquery.SchemaField("libelle", "STRING"),
+        ],
+    ),
+    # — Contexte de travail —
+    bigquery.SchemaField(
+        "contexteTravail",
+        "RECORD",
+        fields=[
+            bigquery.SchemaField("conditionsExercice", "STRING", mode="REPEATED"),
+            bigquery.SchemaField("horaires", "STRING", mode="REPEATED"),
+        ],
+    ),
+    # — Origine —
+    bigquery.SchemaField(
+        "origineOffre",
+        "RECORD",
+        fields=[
+            bigquery.SchemaField("origine", "STRING"),  # ⚠ autodetect: INTEGER
+            bigquery.SchemaField("urlOrigine", "STRING"),
+            bigquery.SchemaField(
+                "partenaires",
+                "RECORD",
+                mode="REPEATED",
+                fields=[
+                    bigquery.SchemaField("url", "STRING"),
+                    bigquery.SchemaField("logo", "STRING"),
+                    bigquery.SchemaField("nom", "STRING"),
+                ],
+            ),
+        ],
+    ),
+    # — Agence —
+    bigquery.SchemaField(
+        "agence",
+        "RECORD",
+        fields=[
+            bigquery.SchemaField("courriel", "STRING"),
+        ],
+    ),
+    # — Ingestion —
+    bigquery.SchemaField("_ingestion_date", "DATE"),
+]
+
 
 def deduplicate_offres(offres: list[dict]) -> list[dict]:
     """Déduplique les offres par id (last-wins)."""
@@ -94,6 +278,7 @@ def run():
         "raw",
         "france_travail",
         write_disposition="WRITE_APPEND",
+        schema=FRANCE_TRAVAIL_SCHEMA,
         time_partitioning=bigquery.TimePartitioning(field="_ingestion_date"),
     )
     logger.info("bq_load_complete", table="raw.france_travail")
