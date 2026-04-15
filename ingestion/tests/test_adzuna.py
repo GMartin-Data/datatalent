@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 import httpx
 import pytest
 from adzuna.client import fetch_all_offers
-from adzuna.ingest import _extract_value, _map_offer, run
+from adzuna.ingest import ADZUNA_SCHEMA, _extract_value, _map_offer, run
 from google.cloud import bigquery
 
 
@@ -279,6 +279,7 @@ class TestRun:
             "raw",
             "adzuna",
             write_disposition="WRITE_APPEND",
+            schema=ADZUNA_SCHEMA,
             time_partitioning=bigquery.TimePartitioning(field="_ingestion_date"),
         )
 
