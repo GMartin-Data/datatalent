@@ -2,9 +2,16 @@
 # Déclenché sur chaque PR vers main.
 #
 # Jobs:
+# - changes (détection des paths modifiés),
 # - python-checks (lint + tests Python),
 # - dbt-validate (compile + test),
-# - terraform-validate (fmt + validate).
+# - terraform-validate (fmt + validate),
+# - ci-success (aggregate, requis par la branch protection).
+#
+# Chaque job métier ne tourne que si son périmètre a été touché
+# par la PR. Le job ci-success agrège les résultats: il réussit
+# si tous les jobs amont sont 'success' ou 'skipped', échoue si
+# l'un est 'failure' ou 'cancelled'.
 #
 # Le CI ne remplace PAS les vérifications locales dbt :
 #   cd dbt && uv run dbt build --select <modèle>
@@ -24,11 +31,32 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Détecte quels périmètres ont été modifiés dans la PR.
+  # Les outputs sont consommés par les jobs aval via leur
+  # clause 'if:' pour éviter de tourner inutilement.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      ingestion: ${{ steps.filter.outputs.ingestion }}
+      dbt: ${{ steps.filter.outputs.dbt }}
+      infra: ${{ steps.filter.outputs.infra }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            ingestion: 'ingestion/**'
+            dbt: 'dbt/**'
+            infra: 'infra/**'
+
   # Lint et tests Python regroupés dans un seul job:
   # ils partagent le même environnement uv, donc fusionner évite
   # de payer 2x le coût de setup runner + checkout + uv sync
   # au prix marginal de ne pas paralléliser lint et tests.
   python-checks:
+    needs: changes
+    if: needs.changes.outputs.ingestion == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -51,6 +79,8 @@ jobs:
         run: uv run pytest -v
 
   dbt-validate:
+    needs: changes
+    if: needs.changes.outputs.dbt == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -86,6 +116,8 @@ jobs:
       - run: uv run dbt test
 
   terraform-validate:
+    needs: changes
+    if: needs.changes.outputs.infra == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -98,3 +130,31 @@ jobs:
       - run: terraform init -backend=false
       - run: terraform fmt -check
       - run: terraform validate
+
+  # Job aggregate, à utiliser comme UNIQUE required check dans la
+  # branch protection rule de main.
+  #
+  # Pourquoi: un job avec 'if:' faux est 'skipped', pas 'success'.
+  # Si on protégeait main avec python-checks/dbt-validate/terraform-validate
+  # comme required checks individuels, une PR qui ne touche que dbt/
+  # serait bloquée (python-checks 'skipped' != 'success')
+  #
+  # Ce job tourne TOUJOURS (if: 'always()'), récupère le résultat des 3 jobs amont,
+  # et échoue uniquement si l'un d'eux est 'failure' ou 'cancelled'.
+  # Les 'skipped' sont acceptés.
+  ci-success:
+    runs-on: ubuntu-latest
+    needs: [ python-checks, dbt-validate, terraform-validate ]
+    if: always()
+    steps:
+      - name: Aggregate result
+        run: |
+          echo "python-checks: ${{ needs.python-checks.result }}"
+          echo "dbt-validate: ${{ needs.dbt-validate.result }}"
+          echo "terraform-validate: ${{ needs.terraform-validate.result }}"
+          if [[ "${{ contains(needs.*.result, 'failure') }}" == "true" \
+             || "${{ contains(needs.*.result, 'cancelled') }}" == "true" ]]; then
+            echo "One or more required jobs failed or were cancelled"
+            exit 1
+          fi
+          echo "All required jobs passed or were skipped (out of scope)"
