@@ -2,9 +2,9 @@
 # Déclenché sur chaque PR vers main.
 #
 # Jobs:
-# - lint & test Python (ruff + pytest),
-# - dbt validate (compile + test),
-# - terraform validate (fmt + validate).
+# - python-checks (lint + tests Python),
+# - dbt-validate (compile + test),
+# - terraform-validate (fmt + validate).
 #
 # Le CI ne remplace PAS les vérifications locales dbt :
 #   cd dbt && uv run dbt build --select <modèle>
@@ -13,10 +13,14 @@ name: CI
 
 on:
   pull_request:
-    branches: [main]
+    branches: [ main ]
 
 jobs:
-  lint:
+  # Lint et tests Python regroupés dans un seul job:
+  # ils partagent le même environnement uv, donc fusionner évite
+  # de payer 2x le coût de setup runner + checkout + uv sync
+  # au prix marginal de ne pas paralléliser lint et tests.
+  python-checks:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -24,20 +28,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v4
-      - run: uv sync --group dev
-      - run: uv run ruff check .
-      - run: uv run ruff format --check .
 
-  test:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ingestion
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v4
+      # Sync unique, partagé par les steps lint et tests ci-dessous
       - run: uv sync --group dev
-      - run: uv run pytest -v
+
+      # Lint d'abord (fail fast): Si le formatage est cassé,
+      # inutile de lancer pytest. Le job échoue dès ce step.
+      - name: Lint (ruff)
+        run: |
+          uv run ruff check .
+          uv run ruff format --check .
+
+      - name: Tests (pytest)
+        run: uv run pytest -v
 
   dbt-validate:
     runs-on: ubuntu-latest
