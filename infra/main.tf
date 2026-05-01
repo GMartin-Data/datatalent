@@ -177,12 +177,20 @@ resource "google_bigquery_dataset" "billing_export" {
   description = "GCP billing export - detailed usage cost data"
 }
 
+# Résolution dynamique du project number (numérique) à partir du project ID
+# L'API Cloud Billing renormalise toujours vers le project number;
+# sans cette data source, le HCL utilise le project ID alphanumérique et 
+# Terraform détecte un drift permanent au plan suivant.
+data "google_project" "current" {
+  project_id = var.project_id
+}
+
 resource "google_billing_budget" "project_budget" {
   billing_account = var.billing_account_id
   display_name    = "DataTalent - 10 EUR monthly budget"
 
   budget_filter {
-    projects = ["projects/${var.project_id}"]
+    projects = ["projects/${data.google_project.current.number}"]
   }
 
   amount {
