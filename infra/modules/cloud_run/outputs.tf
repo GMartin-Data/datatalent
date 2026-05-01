@@ -4,6 +4,6 @@ output "job_name" {
 }
 
 output "scheduler_name" {
-  description = "Name of the Cloud Scheduler Job"
-  value       = google_cloud_scheduler_job.this.name
+  description = "Name of the Cloud Scheduler Job (null if create_scheduler = false)"
+  value       = try(google_cloud_scheduler_job.this[0].name, null)
 }

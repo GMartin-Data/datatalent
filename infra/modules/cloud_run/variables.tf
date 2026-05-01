@@ -62,3 +62,9 @@ variable "secret_env_vars" {
   description = "Map of environment variable name to secret ID (e.g. FT_CLIENT_ID => projects/.../secrets/ft-client-id)"
   type        = map(string)
 }
+
+variable "create_scheduler" {
+  description = "Whether to create a Cloud Scheduler that triggers the job. Set to false when invocation is handled elsewhere (e.g. from another Cloud Run Job)."
+  type        = bool
+  default     = true
+}
