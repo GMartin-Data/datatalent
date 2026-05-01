@@ -83,6 +83,8 @@ resource "google_cloud_run_v2_job_iam_member" "invoker" {
 # Cloud Run vérifie le token → consulte le binding ci-dessus → autorise.
 
 resource "google_cloud_scheduler_job" "this" {
+  count = var.create_scheduler ? 1 : 0
+
   project   = var.project_id
   region    = var.region
   name      = "${var.job_name}-scheduler"
@@ -97,4 +99,19 @@ resource "google_cloud_scheduler_job" "this" {
       service_account_email = var.service_account_email
     }
   }
+}
+
+# --- 4. Migration du state (T9.9a) ---
+#
+# Quand `count` a été ajouté à google_cloud_scheduler_job.this, l'adresse
+# de la ressource dans le state est passée de "...this" à "...this[0]".
+# Sans ce bloc, Terraform détruirait l'ancienne adresse et recréerait la
+# nouvelle, provoquant une coupure transitoire du cron datatalent-ingestion.
+#
+# Le bloc `moved` est inerte une fois le state migré.
+# On le conserve comme documentation vivante du refactor:
+# un futur lecteur comprend pourquoi le Scheduler est conditionnel.
+moved {
+  from = google_cloud_scheduler_job.this
+  to   = google_cloud_scheduler_job.this[0]
 }
