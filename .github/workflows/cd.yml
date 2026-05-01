@@ -1,0 +1,69 @@
+# CD - GitHub Actions
+# Déclenché sur chaque merge dans main qui modifie le code ingestion
+# OU le workflow CD lui-même.
+#
+# Jobs:
+# - build + push Docker image ingestion vers Artifact Registry
+# - update Cloud Run Job avec la nouvelle image
+
+name: Deploy
+
+on:
+  push:
+    branches: [ main ]
+    # Le CD ne tourne que si du code ingestion change, ou si le
+    # workflow CD lui-même est modifié (sinon, une modif du cd
+    # ne serait jamais validée tant qu'aucune modif d'ingestion ne passe).
+    #
+    # Les autres périmètres (dbt, infra, .github/workflows/ci.yml)
+    # n'ont aucune raison de redéployer l'image ingestion.
+    paths:
+      - "ingestion/**"
+      - ".github/workflows/cd.yml"
+
+# Sérialise les cd consécutifs sur la même ref.
+# Pas de cancel-in-progress: annuler un docker push à mi-chemin
+# laisserait une image partielle sur Artifact Registry.
+concurrency:
+  group: cd-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v2
+        with:
+          # Clé JSON du service account ingestion: vraiment sensible,
+          # reste dans secrets.*
+          credentials_json: ${{ secrets.GCP_SA_INGESTION_KEY }}
+
+      - name: Configure Docker for Artifact Registry
+        # GCP_REGION migré vers vars.*: valeur non-sensible,
+        # déjà visible dans l'URL Artifact Registry des logs.
+        run: |
+          gcloud auth configure-docker \
+            "${{ vars.GCP_REGION }}-docker.pkg.dev" \
+            --quiet
+
+      - name: Build and push ingestion image
+        run: |
+          IMAGE="${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/datatalent/ingestion:${{ github.sha }}"
+          docker build -t "$IMAGE" ingestion/
+          docker push "$IMAGE"
+
+  deploy-job:
+    needs: build-push
+    runs-on: ubuntu-latest
+    steps:
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_INGESTION_KEY }}
+
+      - name: Update Cloud Run Job
+        run: |
+          gcloud run jobs update datatalent-ingestion \
+            --image="${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/datatalent/ingestion:${{ github.sha }}" \
+            --region="${{ vars.GCP_REGION }}"
