@@ -170,6 +170,51 @@ module "cloud_run" {
   depends_on = [google_project_service.apis]
 }
 
+# --- Compute: Cloud Run Job dbt ---
+# Pipeline de transformation dbt - matérialise les marts BigQuery.
+# Pas de Cloud Scheduler dédié: l'invocation est faite depuis main.py
+# du Job ingestion, conditionnellement à la réussite des sources (D72, T9.17).
+# Le tag ":initial" est un placeholder de bootstrap: cd-dbt.yml le remplace
+# par :$GITHUB_SHA à chaque merge sur main qui touche dbt/.
+
+module "cloud_run_dbt" {
+  source = "./modules/cloud_run"
+
+  project_id            = var.project_id
+  region                = var.region
+  job_name              = "datatalent-dbt"
+  image                 = "${google_artifact_registry_repository.docker.location}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.docker.repository_id}/dbt:initial"
+  service_account_email = google_service_account.sa_dbt.email
+
+  # dbt orchestre BigQuery par API: le travail computationnel se passe
+  # côté BQ, pas dans le conteneur. 1Gi suffit largement (vs 4Gi pour
+  # l'ingestion qui matérialise Sirene en /tmp).
+  memory = "1Gi"
+
+  # Pas de scheduler: invocation depuis ingestion/main.py (D72).
+  # var.schedule reste obligatoire dans le module mais ignoré quand
+  # create_scheduler = false. Valeur arbitraire conservée par cohérence.
+  create_scheduler = false
+  schedule         = "0 7 * * 1"
+
+  # dbt n'accède à aucune source authentifiée: BigQuery via ADC du SA
+  # d'exécution (sa-dbt), aucun secret à injecter.
+  secret_env_vars = {}
+
+  depends_on = [google_project_service.apis]
+}
+
+# Autorise sa-ingestion à invoquer datatalent-dbt depuis main.py (T9.17).
+# Scope ressource (pas projet): least-privilege strict, sa-ingestion ne peut
+# invoquer que ce job précis, pas n'importe quel Cloud Run du projet.
+resource "google_cloud_run_v2_job_iam_member" "sa_ingestion_invokes_dbt" {
+  project  = var.project_id
+  location = var.region
+  name     = module.cloud_run_dbt.job_name
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:${module.iam.service_account_email}"
+}
+
 resource "google_bigquery_dataset" "billing_export" {
   dataset_id = "billing_export"
   location   = var.region
