@@ -1,4 +1,4 @@
-# CD - GitHub Actions
+# CD - Ingestion
 # Déclenché sur chaque merge dans main qui modifie le code ingestion
 # OU le workflow CD lui-même.
 #
@@ -6,7 +6,7 @@
 # - build + push Docker image ingestion vers Artifact Registry
 # - update Cloud Run Job avec la nouvelle image
 
-name: Deploy
+name: CD - Ingestion
 
 on:
   push:
@@ -19,13 +19,13 @@ on:
     # n'ont aucune raison de redéployer l'image ingestion.
     paths:
       - "ingestion/**"
-      - ".github/workflows/cd.yml"
+      - ".github/workflows/cd-ingestion.yml"
 
 # Sérialise les cd consécutifs sur la même ref.
 # Pas de cancel-in-progress: annuler un docker push à mi-chemin
 # laisserait une image partielle sur Artifact Registry.
 concurrency:
-  group: cd-${{ github.ref }}
+  group: cd-ingestion-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
