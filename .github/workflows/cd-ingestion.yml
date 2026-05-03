@@ -1,4 +1,7 @@
 # CD - Ingestion
+# Paire avec .github/workflows/cd-dbt.yml: deux CD distincts,
+# un par image (ingestion, dbt), même pattern.
+#
 # Déclenché sur chaque merge dans main qui modifie le code ingestion
 # OU le workflow CD lui-même.
 #

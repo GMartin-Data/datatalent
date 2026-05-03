@@ -1,0 +1,78 @@
+# CD - dbt
+# Paire avec .github/workflows/cd-ingestion.yml: deux CD distincts,
+# un par image (ingestion, dbt), même pattern.
+#
+# Déclenché sur chaque merge dans main qui modifie le code dbt
+# OU le workflow CD lui-même.
+#
+# Jobs:
+# - build + push Docker image dbt vers Artifact Registry
+# - update Cloud Run Job avec la nouvelle image
+
+name: CD - dbt
+
+on:
+  push:
+    branches: [ main ]
+    # Le CD ne tourne que si du code dbt change, ou si le
+    # workflow CD lui-même est modifié (sinon, une modif du cd
+    # ne serait jamais validée tant qu'aucune modif dbt ne passe).
+    #
+    # Les autres périmètres (ingestion, infra, .github/workflows/ci.yml)
+    # n'ont aucune raison de redéployer l'image dbt.
+    paths:
+      - "dbt/**"
+      - ".github/workflows/cd-dbt.yml"
+
+# Sérialise les cd consécutifs sur la même ref.
+# Pas de cancel-in-progress: annuler un docker push à mi-chemin
+# laisserait une image partielle sur Artifact Registry.
+# Group distinct de cd-ingestion: les deux CD peuvent tourner en parallèle.
+concurrency:
+  group: cd-dbt-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v2
+        with:
+          # SA de déploiement = sa-ingestion: porte artifactregistry.writer
+          # + run.developer au niveau projet (T9.7). La séparation des
+          # privilèges runtime est portée par les SA d'exécution distincts
+          # (sa-ingestion vs sa-dbt, D60), pas par le SA de déploiement.
+          credentials_json: ${{ secrets.GCP_SA_INGESTION_KEY }}
+
+      - name: Configure Docker for Artifact Registry
+        run: |
+          gcloud auth configure-docker \
+            "${{ vars.GCP_REGION }}-docker.pkg.dev" \
+            --quiet
+
+      - name: Build and push dbt image
+        # D73: au premier run après terraform apply T9.9b (image :initial
+        # placeholder), ce step écrase :initial par :$GITHUB_SHA. D73 couvre
+        # le bootstrap one-shot (CreateJob RPC), ce CD couvre la mise à jour
+        # continue post-création, rendue possible par
+        # lifecycle.ignore_changes = [containers[0].image, ...] du module cloud_run/.
+        run: |
+          IMAGE="${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/datatalent/dbt:${{ github.sha }}"
+          docker build -t "$IMAGE" dbt/
+          docker push "$IMAGE"
+
+  deploy-job:
+    needs: build-push
+    runs-on: ubuntu-latest
+    steps:
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_INGESTION_KEY }}
+
+      - name: Update Cloud Run Job
+        run: |
+          gcloud run jobs update datatalent-dbt \
+            --image="${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/datatalent/dbt:${{ github.sha }}" \
+            --region="${{ vars.GCP_REGION }}"
