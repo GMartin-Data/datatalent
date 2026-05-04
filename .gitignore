@@ -17,6 +17,7 @@ dbt/.user.yml
 infra/terraform.tfvars
 infra/.terraform/
 infra/*.tfstate*
+infra/logs/
 
 # IDE
 .vscode/
@@ -28,3 +29,6 @@ infra/*.tfstate*
 #Quentin    
 dataexplo.ipynb
 ingestion/sirene/data/
+
+# Ingestion
+ingestion/logs/

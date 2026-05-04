@@ -2,4 +2,61 @@ version: 2
 
 models:
   - name: stg_bmo__projets_recrutement
-    description: Projets de recrutement IT par bassin × département, 6 codes FAP M1X/M2X.
+    description: >
+      Projets de recrutement IT par bassin d'emploi, département et métier FAP2021.
+      Source: enquête BMO 2025 (France Travail). 6 codes métier IT filtrés à 
+      l'ingestion (préfixes M1X/M2X). Les nulls sur projets_recrutement, 
+      projets_difficiles et projets_saisonniers correspondent au secret statistique 
+      (seuil de diffusion). Colonnes renommées à l'ingestion (D39).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns:
+              - annee
+              - code_bassin_emploi
+              - code_departement
+              - code_metier_bmo
+
+    columns:
+      - name: annee
+        description: Année de l'enquête BMO (2025)
+        data_tests:
+          - not_null
+      - name: code_metier_bmo
+        description: >
+          Code métier FAP2021. 6 codes IT: M1X80 (dev technicien), 
+          M1X81 (ops/support technicien), M2X90 (dev/archi ingénieur), 
+          M2X91 (management IT), M2X92 (ops/infra cadre), M2X93 (consultants SI)
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["M1X80", "M1X81", "M2X90", "M2X91", "M2X92", "M2X93"]
+      - name: code_famille_metier
+        description: "Code famille FAP2021: A (techniciens) ou C (cadres)"
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["A", "C"]
+      - name: code_departement
+        description: Code département INSEE
+        data_tests:
+          - not_null
+      - name: code_bassin_emploi
+        description: "Code bassin d'emploi (suffixe 25 = année du découpage)"
+        data_tests:
+          - not_null
+      - name: projets_recrutement
+        description: >
+          Nombre de projets de recrutement. NULL = secret statistique (62.7% exploitables).
+      - name: projets_difficiles
+        description: >
+          Nombre de projets jugés difficiles. NULL = secret statistique (42.4% exploitables).
+      - name: projets_saisonniers
+        description: >
+          Nombre de projets saisonniers. NULL = secret statistique. 
+          Quasi inexploitable pour l'IT (95% masqué)
+      - name: part_difficile_pct
+        description: >
+          Pourcentage de projets jugés difficiles. NULL si l'un des deux 
+          opérandes est masqué. Arrondi à 1 décimale.

@@ -2,4 +2,81 @@ version: 2
 
 models:
   - name: stg_france_travail__offres
-    description: Offres d'emploi IT nettoyées, déduplication ROW_NUMBER, salaire parsé, categorie_metier.
+    description: "Table staging des offres France Travail (JSON → tabulaire)"
+    columns:
+
+      - name: offre_id
+        tests:
+          - not_null
+          - unique
+
+      - name: intitule
+        tests:
+          - not_null
+
+      - name: rome_code
+        tests:
+          - not_null
+
+      - name: date_creation
+        tests:
+          - not_null
+
+      - name: source
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['france_travail']
+              config:
+                severity: warn
+
+      - name: type_contrat
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['CDI', 'CDD', 'MIS', 'LIB', 'CCE', 'SAI', 'DDI']
+              config:
+                severity: warn
+
+      - name: experience_exige
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['D', 'E']
+              config:
+                severity: warn
+
+      - name: categorie_metier
+        tests:
+          - accepted_values:
+              values: [
+                'data_engineer',
+                'data_analyst',
+                'data_architect',
+                'bi_decisionnel',
+                'ml_engineer',
+                'data_scientist',
+                'autre_it'
+              ]
+              config:
+                severity: warn
+
+      - name: salaire_periodicite
+        tests:
+          - accepted_values:
+              values: ['annuel', 'mensuel', 'horaire']
+              quote: true
+              config:
+                severity: warn
+
+      - name: code_departement
+        tests:
+          - not_null
+
+      - name: code_commune
+        tests:
+          - relationships:
+              to: ref('stg_geo__communes')
+              field: code
+              config:
+                severity: warn

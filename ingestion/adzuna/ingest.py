@@ -23,6 +23,27 @@ from .config import (
 
 logger = get_logger(__name__)
 
+ADZUNA_SCHEMA = [
+    bigquery.SchemaField("offre_id", "STRING"),  # ⚠ autodetect: INTEGER
+    bigquery.SchemaField("titre", "STRING"),
+    bigquery.SchemaField("description", "STRING"),
+    bigquery.SchemaField("date_creation", "TIMESTAMP"),
+    bigquery.SchemaField("entreprise_nom", "STRING"),
+    bigquery.SchemaField("localisation_libelle", "STRING"),
+    bigquery.SchemaField("localisation_area", "STRING", mode="REPEATED"),
+    bigquery.SchemaField("latitude", "FLOAT"),
+    bigquery.SchemaField("longitude", "FLOAT"),
+    bigquery.SchemaField("salaire_min", "FLOAT"),  # ⚠ autodetect: INTEGER
+    bigquery.SchemaField("salaire_max", "FLOAT"),  # ⚠ autodetect: INTEGER
+    bigquery.SchemaField("salaire_est_estime", "INTEGER"),
+    bigquery.SchemaField("type_contrat", "STRING"),
+    bigquery.SchemaField("temps_travail", "STRING"),
+    bigquery.SchemaField("categorie_tag", "STRING"),
+    bigquery.SchemaField("categorie_libelle", "STRING"),
+    bigquery.SchemaField("redirect_url", "STRING"),
+    bigquery.SchemaField("_ingestion_date", "DATE"),
+]
+
 
 def _extract_value(offer: dict, dotted_key: str):
     """Extrait une valeur depuis un dict imbriqué via notation pointée.
@@ -90,6 +111,7 @@ def run() -> None:
         gcs_uri,
         BQ_DATASET,
         BQ_TABLE,
+        schema=ADZUNA_SCHEMA,
         write_disposition="WRITE_APPEND",
         time_partitioning=bigquery.TimePartitioning(field="_ingestion_date"),
     )
