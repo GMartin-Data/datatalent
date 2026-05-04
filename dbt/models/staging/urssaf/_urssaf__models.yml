@@ -75,6 +75,3 @@ models:
           même caveat que nb_etablissements.
         data_tests:
           - not_null
-
-  - name: stg_urssaf__masse_salariale_na88
-    description: Masse salariale brute secteur IT (NA88 = 62), ~30 lignes.
