@@ -2,7 +2,6 @@ version: 2
 
 models:
   - name: stg_urssaf__effectifs_commune_ape
-<<<<<<< feature/stg-urssaf-massesalariale
     description: Effectifs salariés par commune × APE IT, null → 0 en staging.
 
   - name: stg_urssaf__masse_salariale_na88
@@ -27,7 +26,6 @@ models:
         description: "Date et heure d'ingestion des données."
         tests:
           - not_null
-=======
     description: >
       Effectifs salariés et établissements employeurs IT par commune × code APE × année
       (2006–2024). Source : open.urssaf.fr, dataset Opendatasoft. 4 codes APE IT filtrés
@@ -80,4 +78,3 @@ models:
 
   - name: stg_urssaf__masse_salariale_na88
     description: Masse salariale brute secteur IT (NA88 = 62), ~30 lignes.
->>>>>>> main
