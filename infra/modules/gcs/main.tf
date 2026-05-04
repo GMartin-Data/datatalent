@@ -10,4 +10,16 @@ resource "google_storage_bucket" "raw" {
   soft_delete_policy {
     retention_duration_seconds = 604800
   }
+
+  # Purge des fichiers raw > 90 jours pour éviter l'accumulation
+  # de snapshots obsolètes (Sirene ~2.5 GB/mois). BigQuery fait
+  # foi après chargement. Voir D68.
+  lifecycle_rule {
+    condition {
+      age = 90 # jours
+    }
+    action {
+      type = "Delete"
+    }
+  }
 }

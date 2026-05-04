@@ -4,7 +4,12 @@ import json
 import os
 from unittest.mock import patch
 
-from france_travail.ingest import deduplicate_offres, run, write_jsonl
+from france_travail.ingest import (
+    FRANCE_TRAVAIL_SCHEMA,
+    deduplicate_offres,
+    run,
+    write_jsonl,
+)
 from google.cloud import bigquery
 
 
@@ -104,6 +109,7 @@ class TestRun:
             "raw",
             "france_travail",
             write_disposition="WRITE_APPEND",
+            schema=FRANCE_TRAVAIL_SCHEMA,
             time_partitioning=bigquery.TimePartitioning(field="_ingestion_date"),
         )
 

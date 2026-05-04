@@ -27,6 +27,7 @@ logger = get_logger(__name__)
 REGIONS_SCHEMA = [
     bigquery.SchemaField("nom", "STRING"),
     bigquery.SchemaField("code", "STRING"),
+    bigquery.SchemaField("zone", "STRING"),
     bigquery.SchemaField("_ingestion_date", "DATE"),
 ]
 
@@ -34,6 +35,7 @@ DEPARTEMENTS_SCHEMA = [
     bigquery.SchemaField("nom", "STRING"),
     bigquery.SchemaField("code", "STRING"),
     bigquery.SchemaField("codeRegion", "STRING"),
+    bigquery.SchemaField("zone", "STRING"),
     bigquery.SchemaField("_ingestion_date", "DATE"),
 ]
 
@@ -44,6 +46,14 @@ COMMUNES_SCHEMA = [
     bigquery.SchemaField("codeRegion", "STRING"),
     bigquery.SchemaField("codesPostaux", "STRING", mode="REPEATED"),
     bigquery.SchemaField("population", "INTEGER"),
+    bigquery.SchemaField(
+        "centre",
+        "RECORD",
+        fields=[
+            bigquery.SchemaField("type", "STRING"),
+            bigquery.SchemaField("coordinates", "FLOAT64", mode="REPEATED"),
+        ],
+    ),
     bigquery.SchemaField("_ingestion_date", "DATE"),
 ]
 

@@ -1,10 +1,20 @@
-# DataTalent — Docker Compose (dev local)
-# Usage : docker compose up ingestion
+# Authentification GCP partagée - monte le fichier ADC dans les conteneurs
+# En prod (Cloud Run), le service account du job remplace ce mécanisme
+x-gcp-auth: &gcp-auth
+  volumes:
+    - ~/.config/gcloud/application_default_credentials.json:/tmp/keys/adc.json:ro
+  environment:
+    - GOOGLE_APPLICATION_CREDENTIALS=/tmp/keys/adc.json
+
 services:
   ingestion:
     build:
-      context: ./ingestion
-      dockerfile: Dockerfile
+      context: ingestion/
     env_file: .env
-    volumes:
-      - ./ingestion:/app
+    <<: *gcp-auth
+
+  dbt:
+    build:
+      context: ./dbt
+    command: ["build"]
+    <<: *gcp-auth
