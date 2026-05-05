@@ -1,6 +1,14 @@
+-- stg_bmo__projets_recrutement.sql
+-- Source : raw.bmo (JSONL, WRITE_TRUNCATE D19)
+-- Grain : une ligne = un bassin × un département × un code métier FAP × une année
+-- Transformation : pass-through (colonnes renommées et typées à l'ingestion, D39)
+--   + 1 colonne calculée part_difficile_pct
+-- Note : NULLs sur projets_recrutement/difficiles/saisonniers = secret statistique
+--   (conversion '*' → null à l'ingestion). Ne pas remplacer par 0.
+
 WITH source AS (
     SELECT *
-    FROM {{ source('bmo', 'bmo')}}
+    FROM {{ source('bmo', 'bmo') }}
 )
 
 SELECT
@@ -19,6 +27,7 @@ SELECT
     projets_difficiles,
     projets_saisonniers,
 
+    -- Colonne calculée : part de projets jugés difficiles
     CASE
         WHEN projets_recrutement IS NOT NULL
          AND projets_difficiles IS NOT NULL
