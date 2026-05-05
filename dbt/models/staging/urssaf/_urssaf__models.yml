@@ -10,35 +10,43 @@ models:
       l'ingestion (D39). ⚠ Paris = arrondissements 75101–75120, pas commune 75056.
     data_tests:
       - dbt_utils.unique_combination_of_columns:
-          combination_of_columns:
-            - code_commune
-            - code_ape
-            - annee
+          arguments:
+            combination_of_columns:
+              - code_commune
+              - code_ape
+              - annee
     columns:
       - name: code_commune
         description: Code INSEE commune.
         data_tests:
           - not_null
+
       - name: intitule_commune
         description: Champ composite URSSAF.
+
       - name: code_departement
         description: Code département
         data_tests:
           - not_null
+
       - name: code_ape
         description: Code APE sans point.
         data_tests:
           - not_null
           - accepted_values:
-              values: ['6201Z', '6202A', '6203Z', '6209Z']
+              arguments:
+                values: ['6201Z', '6202A', '6203Z', '6209Z']
+
       - name: annee
         description: Année de référence (2006–2024)
         data_tests:
           - not_null
+
       - name: nb_etablissements
         description: Nombre d'établissements employeurs.
         data_tests:
           - not_null
+
       - name: effectifs_salaries
         description: Effectifs salariés en fin d'année.
         data_tests:
@@ -52,14 +60,17 @@ models:
         description: "Code de la nomenclature NA88."
         data_tests:
           - not_null
+
       - name: annee_date
         description: "Année de référence des données."
         data_tests:
           - not_null
+
       - name: masse_salariale_brute
         description: "Montant total brut en euros."
         data_tests:
           - not_null
+
       - name: ingested_at
         description: "Date et heure d'ingestion des données."
         data_tests:
