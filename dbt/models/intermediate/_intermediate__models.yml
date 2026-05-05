@@ -2,8 +2,96 @@ version: 2
 
 models:
   - name: int_offres_enrichies
-    description: UNION ALL France Travail + Adzuna, enrichi noms géographiques via API Géo.
-  - name: int_densite_sectorielle_commune
-    description: Effectifs et établissements IT agrégés par commune x année.
-  - name: int_tensions_bassin_emploi
-    description: Projets de recrutement IT et taux de difficulté par département x année.
+    description: >
+      Table unifiée des offres d'emploi IT/Data. Combine France Travail
+      et Adzuna via UNION ALL, puis enrichit les offres avec les libellés
+      géographiques issus de l'API Géo. Le chemin principal utilise
+      code_commune via stg_geo__communes ; un fallback via code_departement
+      permet de renseigner nom_departement et nom_region quand code_commune
+      est absent, notamment pour Adzuna.
+
+    columns:
+      - name: offre_id
+        description: Identifiant technique de l'offre dans sa source d'origine.
+        tests:
+          - not_null
+
+      - name: titre
+        description: Titre de l'offre.
+        tests:
+          - not_null
+
+      - name: date_creation
+        description: Date de création/publication de l'offre.
+        tests:
+          - not_null
+
+      - name: source
+        description: Source de l'offre.
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['france_travail', 'adzuna']
+
+      - name: categorie_metier
+        description: Catégorie métier harmonisée issue du staging.
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - 'data_engineer'
+                  - 'data_analyst'
+                  - 'data_architect'
+                  - 'bi_decisionnel'
+                  - 'ml_engineer'
+                  - 'data_scientist'
+                  - 'autre_it'
+
+      - name: is_metier_data
+        description: Booléen indiquant si l'offre appartient au périmètre data.
+        tests:
+          - not_null
+
+      - name: type_contrat
+        description: >
+          Type de contrat harmonisé. FT conserve ses codes natifs ;
+          Adzuna mappe permanent -> CDI et contract -> CDD.
+        tests:
+          - accepted_values:
+              arguments:
+                values: ['CDI', 'CDD', 'MIS', 'LIB', 'CCE', 'SAI', 'DDI', 'FRA']
+              config:
+                where: "type_contrat IS NOT NULL"
+
+      - name: source_salaire
+        description: Source déclarative du salaire quand elle existe.
+        tests:
+          - accepted_values:
+              arguments:
+                values: ['declare']
+              config:
+                where: "source_salaire IS NOT NULL"
+
+      - name: code_commune
+        description: Code INSEE commune. Présent surtout côté France Travail.
+        tests:
+          - relationships:
+              arguments:
+                to: ref('stg_geo__communes')
+                field: code
+              config:
+                where: "code_commune IS NOT NULL"
+
+      - name: code_departement
+        description: >
+          Code département. Présent côté FT et résolu autant que possible
+          côté Adzuna à partir du nom du département.
+        tests:
+          - relationships:
+              arguments:
+                to: ref('stg_geo__departements')
+                field: code
+              config:
+                where: "code_departement IS NOT NULL"
