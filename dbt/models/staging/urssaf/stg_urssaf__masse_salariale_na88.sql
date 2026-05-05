@@ -1,16 +1,20 @@
--- TODO : voir dbt-stg-urssaf-masse-salariale.md
-with source as (
-    select * from {{ source('urssaf', 'urssaf_masse_salariale') }}
-),
-renamed as (
-    select
-        code_na88,
-        libelle_na88,
-        annee,
-        _ingestion_date as ingested_at,
-        masse_salariale_brute,
-        effectifs_salaries_moyens,
-        nb_etablissements
-    from source
+-- stg_urssaf__masse_salariale_na88.sql
+-- Source : raw.urssaf_masse_salariale (JSONL, WRITE_TRUNCATE D19)
+-- Grain : une ligne = une année (1998–2024)
+-- Transformation : pass-through (colonnes renommées et typées à l'ingestion, D39)
+-- Note : pas d'intermediate — jointure directe en mart sur code_na88 = 62
+
+WITH source AS (
+    SELECT *
+    FROM {{ source('urssaf', 'urssaf_masse_salariale') }}
 )
-select * from renamed
+
+-- _ingestion_date exclue : métadonnée technique, pas de valeur analytique pour cette source (spec §2)
+SELECT
+    annee,
+    code_na88,
+    libelle_na88,
+    nb_etablissements,
+    effectifs_salaries_moyens,
+    masse_salariale_brute
+FROM source

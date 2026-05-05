@@ -34,7 +34,7 @@ models:
         tests:
           - not_null
           - accepted_values:
-              values: ['CDI', 'CDD', 'MIS', 'LIB', 'CCE', 'SAI', 'DDI']
+              values: ['CDI', 'CDD', 'MIS', 'LIB', 'CCE', 'SAI', 'DDI', 'FRA']
               config:
                 severity: warn
 
