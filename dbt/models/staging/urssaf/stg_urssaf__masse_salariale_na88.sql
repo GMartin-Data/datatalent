@@ -6,7 +6,7 @@ renamed as (
     select
         code_na88,
         libelle_na88,
-        annee as annee_date,
+        annee,
         _ingestion_date as ingested_at,
         masse_salariale_brute,
         effectifs_salaries_moyens,
