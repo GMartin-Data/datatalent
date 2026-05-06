@@ -95,3 +95,39 @@ models:
                 field: code
               config:
                 where: "code_departement IS NOT NULL"
+
+  - name: int_densite_sectorielle_commune
+    description: >
+      Agrégation des effectifs salariés et établissements du secteur IT (APE 62xx)
+      par commune et par année, à partir des données URSSAF.
+      Les codes communes de Paris, Lyon et Marseille sont normalisés
+      (arrondissements → code central INSEE) pour garantir la jointure
+      avec les offres France Travail dans les marts aval.
+      Grain : une ligne par code_commune × annee.
+
+    columns:
+      - name: code_commune
+        description: >
+          Code INSEE commune, post-normalisation PLM.
+          Paris → 75056, Lyon → 69123, Marseille → 13055.
+        tests:
+          - not_null
+
+      - name: annee
+        description: Année de référence des effectifs URSSAF.
+        tests:
+          - not_null
+
+      - name: nb_etablissements_it
+        description: >
+          Nombre d'établissements du secteur IT (APE 62xx)
+          dans la commune pour l'année donnée.
+        tests:
+          - not_null
+
+      - name: effectifs_salaries_it
+        description: >
+          Nombre de salariés du secteur IT (APE 62xx)
+          dans la commune pour l'année donnée.
+        tests:
+          - not_null
