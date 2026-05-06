@@ -3,12 +3,12 @@ version: 2
 models:
   - name: int_offres_enrichies
     description: >
-      Table unifiée des offres d'emploi IT/Data. Combine France Travail
-      et Adzuna via UNION ALL, puis enrichit les offres avec les libellés
-      géographiques issus de l'API Géo. Le chemin principal utilise
-      code_commune via stg_geo__communes ; un fallback via code_departement
-      permet de renseigner nom_departement et nom_region quand code_commune
-      est absent, notamment pour Adzuna.
+      Table unifiée des offres d'emploi IT/Data. Combine France Travail et
+      Adzuna via UNION ALL, puis enrichit les offres avec les libellés
+      géographiques issus de l'API Géo. Le chemin principal utilise code_commune
+      via stg_geo__communes ; un fallback via code_departement permet de
+      renseigner nom_departement et nom_region quand code_commune est absent,
+      notamment pour Adzuna.
 
     columns:
       - name: offre_id
@@ -32,7 +32,7 @@ models:
           - not_null
           - accepted_values:
               arguments:
-                values: ['france_travail', 'adzuna']
+                values: [ "france_travail", "adzuna" ]
 
       - name: categorie_metier
         description: Catégorie métier harmonisée issue du staging.
@@ -41,13 +41,13 @@ models:
           - accepted_values:
               arguments:
                 values:
-                  - 'data_engineer'
-                  - 'data_analyst'
-                  - 'data_architect'
-                  - 'bi_decisionnel'
-                  - 'ml_engineer'
-                  - 'data_scientist'
-                  - 'autre_it'
+                  - "data_engineer"
+                  - "data_analyst"
+                  - "data_architect"
+                  - "bi_decisionnel"
+                  - "ml_engineer"
+                  - "data_scientist"
+                  - "autre_it"
 
       - name: is_metier_data
         description: Booléen indiquant si l'offre appartient au périmètre data.
@@ -56,12 +56,12 @@ models:
 
       - name: type_contrat
         description: >
-          Type de contrat harmonisé. FT conserve ses codes natifs ;
-          Adzuna mappe permanent -> CDI et contract -> CDD.
+          Type de contrat harmonisé. FT conserve ses codes natifs ; Adzuna mappe
+          permanent -> CDI et contract -> CDD.
         tests:
           - accepted_values:
               arguments:
-                values: ['CDI', 'CDD', 'MIS', 'LIB', 'CCE', 'SAI', 'DDI', 'FRA']
+                values: [ "CDI", "CDD", "MIS", "LIB", "CCE", "SAI", "DDI", "FRA" ]
               config:
                 where: "type_contrat IS NOT NULL"
 
@@ -70,7 +70,7 @@ models:
         tests:
           - accepted_values:
               arguments:
-                values: ['declare']
+                values: [ "declare" ]
               config:
                 where: "source_salaire IS NOT NULL"
 
@@ -86,8 +86,8 @@ models:
 
       - name: code_departement
         description: >
-          Code département. Présent côté FT et résolu autant que possible
-          côté Adzuna à partir du nom du département.
+          Code département. Présent côté FT et résolu autant que possible côté
+          Adzuna à partir du nom du département.
         tests:
           - relationships:
               arguments:
@@ -98,18 +98,17 @@ models:
 
   - name: int_densite_sectorielle_commune
     description: >
-      Agrégation des effectifs salariés et établissements du secteur IT (APE 62xx)
-      par commune et par année, à partir des données URSSAF.
-      Les codes communes de Paris, Lyon et Marseille sont normalisés
-      (arrondissements → code central INSEE) pour garantir la jointure
-      avec les offres France Travail dans les marts aval.
-      Grain : une ligne par code_commune × annee.
+      Agrégation des effectifs salariés et établissements du secteur IT (APE
+      62xx) par commune et par année, à partir des données URSSAF. Les codes
+      communes de Paris, Lyon et Marseille sont normalisés (arrondissements →
+      code central INSEE) pour garantir la jointure avec les offres France
+      Travail dans les marts aval. Grain : une ligne par code_commune × annee.
 
     columns:
       - name: code_commune
         description: >
-          Code INSEE commune, post-normalisation PLM.
-          Paris → 75056, Lyon → 69123, Marseille → 13055.
+          Code INSEE commune, post-normalisation PLM. Paris → 75056, Lyon →
+          69123, Marseille → 13055.
         tests:
           - not_null
 
@@ -120,14 +119,82 @@ models:
 
       - name: nb_etablissements_it
         description: >
-          Nombre d'établissements du secteur IT (APE 62xx)
-          dans la commune pour l'année donnée.
+          Nombre d'établissements du secteur IT (APE 62xx) dans la commune pour
+          l'année donnée.
         tests:
           - not_null
 
       - name: effectifs_salaries_it
         description: >
-          Nombre de salariés du secteur IT (APE 62xx)
-          dans la commune pour l'année donnée.
+          Nombre de salariés du secteur IT (APE 62xx) dans la commune pour
+          l'année donnée.
         tests:
+          - not_null
+
+  - name: int_tensions_bassin_emploi
+    description: >
+      Volumes de projets de recrutement IT et taux de difficulté (deux méthodes)
+      agrégés par département × année. Expose également les compteurs de
+      couverture nécessaires au mart aval pour calculer les flags de fiabilité
+      (D75). Source unique : stg_bmo__projets_recrutement (enquête BMO 2025, 6
+      codes FAP IT). Le WHERE sur M1X%/M2X% est une redondance défensive.
+      Méthode A = AVG des taux par bassin (vue territoriale). Méthode B-filtrée
+      = SUM/SUM aligné sur les lignes complètes (vue volumique).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns:
+              - code_departement
+              - annee
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "nb_bassins_volume_observable <= nb_bassins_total"
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "nb_bassins_taux_calculable <= nb_bassins_volume_observable"
+    columns:
+      - name: code_departement
+        description: Code département INSEE — clé de jointure vers
+          mart_contexte_territorial.
+        data_tests:
+          - not_null
+      - name: annee
+        description: Année de l'enquête BMO (2025).
+        data_tests:
+          - not_null
+      - name: projets_recrutement_it
+        description: >
+          Somme des projets de recrutement IT déclarés dans le département.
+          Plancher : les bassins masqués par secret statistique sont exclus.
+      - name: projets_difficiles_it
+        description: >
+          Somme des projets de recrutement IT jugés difficiles. Couverture
+          structurellement plus faible que projets_recrutement_it (42,4% vs
+          62,7% au global, masquage hiérarchique D75).
+      - name: part_difficile_pct_par_bassin
+        description: >
+          Taux de difficulté méthode A (D75) — moyenne non pondérée des taux par
+          bassin observable. Vue territoriale. Arrondi à 1 décimale.
+      - name: part_difficile_pct_par_projet
+        description: >
+          Taux de difficulté méthode B-filtrée (D75) — ratio volumique (projets
+          difficiles / projets totaux), calculé sur les bassins où les deux
+          mesures sont renseignées. Vue volumique, sémantique intuitive pour le
+          dashboard. Arrondi à 1 décimale.
+      - name: nb_bassins_total
+        description: Nombre total de lignes bassin × métier dans le département × année.
+        data_tests:
+          - not_null
+      - name: nb_bassins_volume_observable
+        description: >
+          Nombre de bassins dont projets_recrutement est connu (non masqué).
+          Alimente pct_couverture_volume et is_fiable_volume au mart.
+        data_tests:
+          - not_null
+      - name: nb_bassins_taux_calculable
+        description: >
+          Nombre de bassins dont projets_difficiles est connu (donc taux par
+          projet calculable). Alimente pct_couverture_taux et is_fiable_taux au
+          mart.
+        data_tests:
           - not_null
