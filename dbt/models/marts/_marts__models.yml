@@ -1,7 +1,0 @@
-version: 2
-
-models:
-  - name: mart_offres
-    description: Table finale offres pour dashboard principal (Looker Studio).
-  - name: mart_contexte_territorial
-    description: Densité IT + tensions recrutement + benchmark salaire par territoire.
