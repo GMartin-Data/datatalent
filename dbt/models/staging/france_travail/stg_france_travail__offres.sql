@@ -115,7 +115,10 @@ enhanced as (
             when salaire_periodicite = 'horaire' and salaire_min_euros > 100 then coalesce(salaire_max_euros, salaire_min_euros)
             when salaire_periodicite = 'horaire' then coalesce(salaire_max_euros, salaire_min_euros) * 1607
             else null
-        end as salaire_annuel_max
+        end as salaire_annuel_max,
+
+        -- D81 — flag de confort sur la cible métier projet
+        (categorie_metier = 'data_engineer') as is_data_engineer
     from classified
 ),
 

@@ -85,3 +85,9 @@ models:
                 field: code
               config:
                 severity: warn
+
+      - name: is_data_engineer
+        tests:
+          - dbt_utils.expression_is_true:
+              arguments:
+                expression: "= (categorie_metier = 'data_engineer')"
