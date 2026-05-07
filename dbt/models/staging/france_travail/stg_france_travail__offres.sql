@@ -72,20 +72,11 @@ deduplicated as (
     ) = 1
 ),
 
-with_metier as (
+classified as (
     select *,
-        -- Classification métier
-        case
-            when REGEXP_CONTAINS(titre, r'data\s+engineer|ing[eé]nieur\s+data|d[eé]veloppeur\s+data|data\s+engineering|ing[eé]nieur\s+de\s+donn[ée]es|data\s+ing[eé]nieur|dceo\s+engineer|data\s+cent(er|re)\s+engineering\s+operations') then 'data_engineer'
-            when REGEXP_CONTAINS(titre, r'architecte\s+data|data\s+architect|architecte\s+de\s+donn[ée]es') then 'data_architect'
-            
-            when REGEXP_CONTAINS(titre, r'data\s+analyst|analyste\s+data|business\s+data\s+analyst|data\s+product\s+analyst|analyste\s+de\s+donn[ée]es') then 'data_analyst'
-            when REGEXP_CONTAINS(titre, r'(?:d[eé]veloppeur|analyste|consultant|ing[eé]nieur)\s+(?:bi|d[eé]cisionnel|business\s+intelligence)|(?:bi|d[eé]cisionnel|business\s+intelligence)\s+(?:d[eé]veloppeur|analyste|consultant|ing[eé]nieur)|power\s*bi|d[eé]veloppeur\s+bi|\bbi\b\s+(?:analyst|developer)') then 'bi_decisionnel'
-            when REGEXP_CONTAINS(titre, r'mlops|ml\s+engineer|machine\s+learning\s+engineer|ing[eé]nieur\s+(machine\s+learning|ml)') then 'ml_engineer'
-            when REGEXP_CONTAINS(titre, r'(?i)data\s+scientist') then 'data_scientist'
-            else 'autre_it'
-        end as categorie_metier,
-        -- Flag métier data
+        -- Classification métier via macro D85 (homogène Adzuna ↔ FT)
+        {{ classify_categorie_metier('titre') }} as categorie_metier,
+        -- Filet large D89 — volontairement plus permissif que categorie_metier
         (REGEXP_CONTAINS(titre, r'(?i)data') 
          or REGEXP_CONTAINS(titre, r'(?i)ml|scientist|engineer|analyst')) as is_metier_data
     from deduplicated
@@ -125,7 +116,7 @@ enhanced as (
             when salaire_periodicite = 'horaire' then coalesce(salaire_max_euros, salaire_min_euros) * 1607
             else null
         end as salaire_annuel_max
-    from with_metier
+    from classified
 ),
 
 final_flags as (
