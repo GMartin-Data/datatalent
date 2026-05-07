@@ -8,13 +8,13 @@
 -- 2. Conserver la version la plus récente selon _ingestion_date
 -- 3. Normaliser les types et calculer les colonnes utiles
 -- 4. Enrichir les salaires avec une périodicité inférée
--- 5. Classifier les intitulés de poste
+-- 5. Classifier les intitulés de poste via macro projet
 -- 6. Ajouter les flags métiers et conserver les colonnes salaire
 --
 -- Remarque :
--- Les REGEX ci-dessous sont provisoires.
--- Elles devront être alignées strictement avec France Travail
--- dès que la version finale commune sera validée.
+-- La classification métier est centralisée dans la macro
+-- classify_categorie_metier afin d'éviter les divergences
+-- entre Adzuna et France Travail.
 -- ============================================================
 
 with source_raw as (
@@ -29,7 +29,7 @@ with source_raw as (
             partition by offre_id
             order by _ingestion_date desc
         ) as _row_num
-    from {{ source('raw', 'adzuna') }}
+    from {{ source('adzuna', 'adzuna') }}
 
 ),
 
@@ -54,7 +54,7 @@ source_typed as (
     -- - l'harmonisation de offre_id en STRING
     -- - les colonnes de géolocalisation
     -- - les colonnes salaire brutes
-    -- - la normalisation du titre pour les REGEX
+    -- - les colonnes contrat / catégorie Adzuna
     -- ========================================================
     select
         -- -------------------------------
@@ -95,7 +95,7 @@ source_typed as (
             else null
         end as source_salaire,
 
-        cast(salaire_est_estime as int64) as salaire_est_estime,
+        safe_cast(salaire_est_estime as int64) as salaire_est_estime,
 
         -- -------------------------------
         -- Contrat / catégorie Adzuna
@@ -104,12 +104,7 @@ source_typed as (
         temps_travail,
         categorie_tag,
         categorie_libelle,
-        redirect_url,
-
-        -- -------------------------------
-        -- Titre normalisé pour les REGEX
-        -- -------------------------------
-        lower(titre) as titre_normalise
+        redirect_url
 
     from source_deduplicated
 
@@ -134,7 +129,7 @@ salary_enriched as (
             when coalesce(salaire_min, salaire_max) between 15000 and 250000 then 'annuel'
             when coalesce(salaire_min, salaire_max) between 1000 and 14999 then 'mensuel'
             else null
-        end as salaire_periodicite_inferree,
+        end as salaire_periodicite,
 
         case
             when coalesce(salaire_min, salaire_max) between 15000 and 250000 then true
@@ -143,8 +138,8 @@ salary_enriched as (
         end as is_salaire_periodicite_inferree,
 
         case
-            when coalesce(salaire_min, salaire_max) between 15000 and 250000 then salaire_min
-            when coalesce(salaire_min, salaire_max) between 1000 and 14999 then salaire_min * 12
+            when coalesce(salaire_min, salaire_max) between 15000 and 250000 then coalesce(salaire_min, salaire_max)
+            when coalesce(salaire_min, salaire_max) between 1000 and 14999 then coalesce(salaire_min, salaire_max) * 12
             else null
         end as salaire_annuel_min,
 
@@ -163,67 +158,12 @@ classified as (
     -- ========================================================
     -- Étape 5 : classification métier à partir du titre
     --
-    -- Version alignée au maximum avec France Travail
-    -- + cas spécifiques observés dans Adzuna
+    -- La logique est centralisée dans la macro projet
+    -- classify_categorie_metier.
     -- ========================================================
     select
         *,
-        case
-            -- ---------------------------
-            -- Data Engineer
-            -- aligné FT + cas spécifiques
-            -- observés dans Adzuna
-            -- ---------------------------
-            when regexp_contains(
-                titre_normalise,
-                r'data\s+engineer|ing[eé]nieur\s+data|d[eé]veloppeur\s+data|data\s+engineering|ing[eé]nieur\s+de\s+donn[ée]es|data\s+ing[eé]nieur|dceo\s+engineer|data\s+cent(er|re)\s+engineering\s+operations'
-            ) then 'data_engineer'
-
-            -- ---------------------------
-            -- Data Architect
-            -- ---------------------------
-            when regexp_contains(
-                titre_normalise,
-                r'architecte\s+data|data\s+architect|architecte\s+de\s+donn[ée]es'
-            ) then 'data_architect'
-
-            -- ---------------------------
-            -- Data Analyst
-            -- ---------------------------
-            when regexp_contains(
-                titre_normalise,
-                r'data\s+analyst|analyste\s+data|business\s+data\s+analyst|data\s+product\s+analyst|analyste\s+de\s+donn[ée]es'
-            ) then 'data_analyst'
-
-            -- ---------------------------
-            -- BI / décisionnel
-            -- ---------------------------
-            when regexp_contains(
-                titre_normalise,
-                r'(?:d[eé]veloppeur|analyste|consultant|ing[eé]nieur)\s+(?:bi|d[eé]cisionnel|business\s+intelligence)|(?:bi|d[eé]cisionnel|business\s+intelligence)\s+(?:d[eé]veloppeur|analyste|consultant|ing[eé]nieur)|power\s*bi|d[eé]veloppeur\s+bi|\bbi\b\s+(?:analyst|developer)'
-            ) then 'bi_decisionnel'
-
-            -- ---------------------------
-            -- ML Engineer
-            -- ---------------------------
-            when regexp_contains(
-                titre_normalise,
-                r'mlops|ml\s+engineer|machine\s+learning\s+engineer|ing[eé]nieur\s+(machine\s+learning|ml)'
-            ) then 'ml_engineer'
-
-            -- ---------------------------
-            -- Data Scientist
-            -- ---------------------------
-            when regexp_contains(
-                titre_normalise,
-                r'data\s+scientist'
-            ) then 'data_scientist'
-
-            -- ---------------------------
-            -- Tous les autres cas
-            -- ---------------------------
-            else 'autre_it'
-        end as categorie_metier
+        {{ classify_categorie_metier('titre') }} as categorie_metier
 
     from salary_enriched
 
@@ -234,10 +174,6 @@ final as (
     -- ========================================================
     -- Étape 6 : ajout des flags métiers finaux
     -- + conservation des colonnes salaire enrichies
-    --
-    -- Ce bloc ajoute :
-    -- - is_metier_data
-    -- - is_data_engineer
     --
     -- On ne filtre aucune ligne ici.
     -- Le tri sera fait plus tard en intermediate.
@@ -257,10 +193,10 @@ final as (
         -- -------------------------------
         categorie_metier,
 
-        case
-            when categorie_metier != 'autre_it' then true
-            else false
-        end as is_metier_data,
+        (
+            regexp_contains(lower(titre), r'data')
+            or regexp_contains(lower(titre), r'ml|scientist|engineer|analyst')
+        ) as is_metier_data,
 
         case
             when categorie_metier = 'data_engineer' then true
@@ -288,7 +224,7 @@ final as (
         salaire_max,
         source_salaire,
         salaire_est_estime,
-        salaire_periodicite_inferree,
+        salaire_periodicite,
         is_salaire_periodicite_inferree,
         salaire_annuel_min,
         salaire_annuel_max,
