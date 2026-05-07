@@ -38,8 +38,9 @@ models:
 
       - name: categorie_metier
         description: >
-          Catégorie métier dérivée du titre via regex.
-          Version provisoire à aligner strictement avec France Travail dès disponibilité des patterns finaux.
+          Catégorie métier dérivée du titre via la macro projet classify_categorie_metier.
+          Cette macro centralise la classification métier afin d'éviter les divergences
+          entre les stagings Adzuna et France Travail.
         data_tests:
           - not_null
           - accepted_values:
@@ -54,14 +55,21 @@ models:
                   - 'autre_it'
 
       - name: is_metier_data
-        description: TRUE si categorie_metier est différente de 'autre_it'.
+        description: >
+          Filet large (D89) — TRUE si le titre contient "data" ou un mot-clé métier
+          (ml, scientist, engineer, analyst). Volontairement plus permissif que
+          categorie_metier pour capter les offres qui touchent à la data au sens large
+          (Software Engineer, Risk Analyst, etc.). Symétrie avec FT.
         data_tests:
           - not_null
 
       - name: is_data_engineer
-        description: TRUE si le titre correspond à une offre de Data Engineer selon la regex métier.
+        description: "Flag métier cible projet : categorie_metier = 'data_engineer' (D81). Symétrie avec FT."
         data_tests:
           - not_null
+          - dbt_utils.expression_is_true:
+              arguments:
+                expression: "= (categorie_metier = 'data_engineer')"
 
       - name: entreprise_nom
         description: Nom de l'entreprise.
@@ -99,12 +107,20 @@ models:
                 where: "source_salaire IS NOT NULL"
 
       - name: salaire_est_estime
-        description: Indicateur source Adzuna de salaire estimé ou non.
+        description: Indicateur source Adzuna de salaire estimé ou non, typé en INT64 via safe_cast.
 
-      - name: salaire_periodicite_inferree
+      - name: salaire_periodicite
         description: >
-          Périodicité de salaire inférée de façon prudente à partir de l'ordre de grandeur du montant Adzuna.
-          Valeurs possibles : annuel, mensuel, sinon NULL.
+          Périodicité de salaire inférée par heuristique sur l'ordre de grandeur du montant Adzuna (D77/D79).
+          Valeurs : 'annuel' si min ∈ [15k, 250k], 'mensuel' si min ∈ [1k, 14999], NULL sinon.
+          Naming aligné Adzuna ↔ FT (D86 A.3) — suffixe _inferree retiré, porté par le flag
+          is_salaire_periodicite_inferree (Adzuna-spécifique).
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['annuel', 'mensuel']
+              config:
+                where: "salaire_periodicite IS NOT NULL"
 
       - name: is_salaire_periodicite_inferree
         description: TRUE si une périodicité salaire a pu être inférée de façon prudente.
@@ -114,6 +130,8 @@ models:
           Salaire minimum annualisé à partir de la périodicité inférée.
           Égal au salaire brut si la périodicité est inférée comme annuelle,
           ou salaire mensuel * 12 si elle est inférée comme mensuelle.
+          Si seul salaire_max est disponible, salaire_annuel_min reprend la valeur disponible
+          pour conserver une symétrie min/max.
 
       - name: salaire_annuel_max
         description: >
