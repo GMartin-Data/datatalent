@@ -140,5 +140,5 @@ final_flags as (
     from enhanced
 )
 
-select *
+select * except(_ingestion_date)
 from final_flags
