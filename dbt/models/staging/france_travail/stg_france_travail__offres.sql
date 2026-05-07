@@ -92,6 +92,8 @@ enhanced as (
             else regexp_extract(localisation_libelle, r'^(\d{2,3})')
         end as code_departement,
 
+
+
         case
             when experience_exige = 'D' then null
             when REGEXP_CONTAINS(experience_libelle, r'(\d+)\s+An\(s\)') then CAST(REGEXP_EXTRACT(experience_libelle, r'(\d+)\s+An\(s\)') AS FLOAT64)
