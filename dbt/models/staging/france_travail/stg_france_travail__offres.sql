@@ -101,10 +101,10 @@ enhanced as (
 
         case
             when salaire_periodicite = 'annuel' then salaire_min_euros
-            when salaire_periodicite = 'mensuel' and salaire_min_euros > 10000 then salaire_min_euros
-            when salaire_periodicite = 'mensuel' then salaire_min_euros * coalesce(salaire_nb_mois, 12)
-            when salaire_periodicite = 'horaire' and salaire_min_euros > 100 then salaire_min_euros
-            when salaire_periodicite = 'horaire' then salaire_min_euros * 1607
+            when salaire_periodicite = 'mensuel' and coalesce(salaire_min_euros, salaire_max_euros) > 10000 then coalesce(salaire_min_euros, salaire_max_euros)
+            when salaire_periodicite = 'mensuel' then coalesce(salaire_min_euros, salaire_max_euros) * coalesce(salaire_nb_mois, 12)
+            when salaire_periodicite = 'horaire' and coalesce(salaire_min_euros, salaire_max_euros) > 100 then coalesce(salaire_min_euros, salaire_max_euros)
+            when salaire_periodicite = 'horaire' then coalesce(salaire_min_euros, salaire_max_euros) * 1607
             else null
         end as salaire_annuel_min,
 
