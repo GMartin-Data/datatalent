@@ -72,6 +72,7 @@ models:
                 quote: true
               config:
                 severity: warn
+                where: "salaire_periodicite IS NOT NULL"
 
       - name: code_departement
         tests:
