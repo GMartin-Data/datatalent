@@ -86,6 +86,9 @@ models:
                 field: code
               config:
                 severity: warn
+          - dbt_utils.expression_is_true:
+              arguments:
+                expression: "NOT (code_commune BETWEEN '75101' AND '75120' OR code_commune BETWEEN '69381' AND '69389' OR code_commune BETWEEN '13201' AND '13216')"
 
       - name: is_data_engineer
         tests:
