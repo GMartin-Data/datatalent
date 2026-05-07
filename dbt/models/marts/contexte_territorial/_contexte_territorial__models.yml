@@ -1,0 +1,69 @@
+version: 2
+
+models:
+  - name: fct_contexte_territorial
+    description: >
+      Mart territorial — chaque offre IT enrichie de 3 contextes (densité communale,
+      tension départementale, benchmark salaire national). Snapshot dernier millésime
+      par source (D76 candidat). Sert le dashboard Looker (US8) avec métadonnées de
+      fiabilité D75 (pct_couverture_*, is_fiable_*, statut_donnee) précalculées pour
+      pallier les limites des champs calculés Looker.
+    config:
+      materialized: table
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns:
+              - source
+              - offre_id
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "pct_couverture_volume >= 0 AND pct_couverture_volume <= 100 OR pct_couverture_volume IS NULL"
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "pct_couverture_volume >= pct_couverture_taux OR pct_couverture_volume IS NULL"
+
+    columns:
+      - name: offre_id
+        description: Identifiant de l'offre, propagé depuis int_offres_enrichies.
+        data_tests:
+          - not_null
+
+      - name: source
+        description: "'france_travail' ou 'adzuna'. Discriminant FT/Adzuna."
+        data_tests:
+          - not_null
+
+      - name: annee_offre
+        description: EXTRACT(YEAR FROM date_creation). Dimension de filtrage temporel Looker.
+        data_tests:
+          - not_null
+
+      # --- Densité communale (snapshot) ---
+      - name: annee_contexte_densite
+        description: Année du snapshot URSSAF effectifs (MAX disponible, attendu 2024).
+
+      - name: nb_etablissements_it
+        description: Établissements IT (4 codes APE 62) dans la commune de l'offre.
+
+      - name: effectifs_salaries_it
+        description: Salariés IT dans la commune de l'offre.
+
+      # --- Tension départementale (snapshot) ---
+      - name: annee_contexte_tension
+        description: Année du snapshot BMO (MAX disponible, attendu 2025).
+
+      - name: projets_recrutement_it
+        description: Plancher des projets de recrutement IT du département (NULLs secret stat ignorés).
+
+      - name: projets_difficiles_it
+        description: Plancher des projets jugés difficiles. Couverture < volume (D75).
+
+      - name: part_difficile_pct_par_bassin
+        description: Taux méthode A — vue territoriale (D75).
+
+      - name: part_difficile_pct_par_projet
+        description: Taux méthode B-filtrée — vue volumique, mesure principale dashboard (D75).
+
+      - name: nb_bassins_total
+        description: Lignes bassin × métier du département. Alimente les pct_couvertur
