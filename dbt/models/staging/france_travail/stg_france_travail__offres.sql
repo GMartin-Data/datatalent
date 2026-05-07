@@ -124,8 +124,10 @@ enhanced as (
 
 final_flags as (
     select *,
-        -- Maintenant salaire_annuel_min est disponible car on "vient de" enhanced
-        (salaire_annuel_min < 15000 or salaire_annuel_min = 0) as is_salaire_aberrant,
+        -- D86 A.5 — borne haute 250k ajoutée (validation empirique 2026-05-07)
+        (salaire_annuel_min < 15000 
+         or salaire_annuel_min = 0 
+         or salaire_annuel_max > 250000) as is_salaire_aberrant,
 
         (salaire_periodicite = 'mensuel' and salaire_min_euros > 10000) 
         or (salaire_periodicite = 'horaire' and salaire_min_euros > 100) as is_salaire_requalifie,
