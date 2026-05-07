@@ -2,7 +2,7 @@
 
 with source as (
     select * 
-    from {{ source('france_travail_raw', 'france_travail') }}
+    from {{ source('france_travail', 'france_travail') }}
 ),
 
 renamed as (
@@ -11,7 +11,7 @@ renamed as (
         id as offre_id,
         TIMESTAMP(dateCreation) as date_creation,
         TIMESTAMP(dateActualisation) as date_actualisation,
-        intitule,
+        intitule as titre,
         description,
         romeCode as rome_code,
         romeLibelle as rome_libelle,
@@ -49,7 +49,7 @@ renamed as (
         END as code_commune,
 
 
-        lieuTravail.libelle as libelle_lieu,
+        lieuTravail.libelle as localisation_libelle,
         CAST(lieuTravail.latitude AS FLOAT64) as latitude,
         CAST(lieuTravail.longitude AS FLOAT64) as longitude,
 
@@ -76,18 +76,18 @@ with_metier as (
     select *,
         -- Classification métier
         case
-            when REGEXP_CONTAINS(intitule, r'data\s+engineer|ing[eé]nieur\s+data|d[eé]veloppeur\s+data|data\s+engineering|ing[eé]nieur\s+de\s+donn[ée]es|data\s+ing[eé]nieur|dceo\s+engineer|data\s+cent(er|re)\s+engineering\s+operations') then 'data_engineer'
-            when REGEXP_CONTAINS(intitule, r'architecte\s+data|data\s+architect|architecte\s+de\s+donn[ée]es') then 'data_architect'
+            when REGEXP_CONTAINS(titre, r'data\s+engineer|ing[eé]nieur\s+data|d[eé]veloppeur\s+data|data\s+engineering|ing[eé]nieur\s+de\s+donn[ée]es|data\s+ing[eé]nieur|dceo\s+engineer|data\s+cent(er|re)\s+engineering\s+operations') then 'data_engineer'
+            when REGEXP_CONTAINS(titre, r'architecte\s+data|data\s+architect|architecte\s+de\s+donn[ée]es') then 'data_architect'
             
-            when REGEXP_CONTAINS(intitule, r'data\s+analyst|analyste\s+data|business\s+data\s+analyst|data\s+product\s+analyst|analyste\s+de\s+donn[ée]es') then 'data_analyst'
-            when REGEXP_CONTAINS(intitule, r'(?:d[eé]veloppeur|analyste|consultant|ing[eé]nieur)\s+(?:bi|d[eé]cisionnel|business\s+intelligence)|(?:bi|d[eé]cisionnel|business\s+intelligence)\s+(?:d[eé]veloppeur|analyste|consultant|ing[eé]nieur)|power\s*bi|d[eé]veloppeur\s+bi|\bbi\b\s+(?:analyst|developer)') then 'bi_decisionnel'
-            when REGEXP_CONTAINS(intitule, r'mlops|ml\s+engineer|machine\s+learning\s+engineer|ing[eé]nieur\s+(machine\s+learning|ml)') then 'ml_engineer'
-            when REGEXP_CONTAINS(intitule, r'(?i)data\s+scientist') then 'data_scientist'
+            when REGEXP_CONTAINS(titre, r'data\s+analyst|analyste\s+data|business\s+data\s+analyst|data\s+product\s+analyst|analyste\s+de\s+donn[ée]es') then 'data_analyst'
+            when REGEXP_CONTAINS(titre, r'(?:d[eé]veloppeur|analyste|consultant|ing[eé]nieur)\s+(?:bi|d[eé]cisionnel|business\s+intelligence)|(?:bi|d[eé]cisionnel|business\s+intelligence)\s+(?:d[eé]veloppeur|analyste|consultant|ing[eé]nieur)|power\s*bi|d[eé]veloppeur\s+bi|\bbi\b\s+(?:analyst|developer)') then 'bi_decisionnel'
+            when REGEXP_CONTAINS(titre, r'mlops|ml\s+engineer|machine\s+learning\s+engineer|ing[eé]nieur\s+(machine\s+learning|ml)') then 'ml_engineer'
+            when REGEXP_CONTAINS(titre, r'(?i)data\s+scientist') then 'data_scientist'
             else 'autre_it'
         end as categorie_metier,
         -- Flag métier data
-        (REGEXP_CONTAINS(intitule, r'(?i)data') 
-         or REGEXP_CONTAINS(intitule, r'(?i)ml|scientist|engineer|analyst')) as is_metier_data
+        (REGEXP_CONTAINS(titre, r'(?i)data') 
+         or REGEXP_CONTAINS(titre, r'(?i)ml|scientist|engineer|analyst')) as is_metier_data
     from deduplicated
 ),
 
@@ -98,7 +98,7 @@ enhanced as (
             when code_commune is not null and length(cast(code_commune as string)) >= 2
                 then substr(cast(code_commune as string), 1, 
                      case when cast(code_commune as string) >= '97' then 3 else 2 end)
-            else regexp_extract(libelle_lieu, r'^(\d{2,3})')
+            else regexp_extract(localisation_libelle, r'^(\d{2,3})')
         end as code_departement,
 
         case
