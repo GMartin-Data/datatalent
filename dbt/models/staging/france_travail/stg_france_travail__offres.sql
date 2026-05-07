@@ -2,7 +2,7 @@
 
 with source as (
     select * 
-    from {{ source('france_travail_raw', 'france_travail') }}
+    from {{ source('france_travail', 'france_travail') }}
 ),
 
 renamed as (
@@ -11,7 +11,7 @@ renamed as (
         id as offre_id,
         TIMESTAMP(dateCreation) as date_creation,
         TIMESTAMP(dateActualisation) as date_actualisation,
-        intitule,
+        intitule as titre,
         description,
         romeCode as rome_code,
         romeLibelle as rome_libelle,
@@ -49,7 +49,7 @@ renamed as (
         END as code_commune,
 
 
-        lieuTravail.libelle as libelle_lieu,
+        lieuTravail.libelle as localisation_libelle,
         CAST(lieuTravail.latitude AS FLOAT64) as latitude,
         CAST(lieuTravail.longitude AS FLOAT64) as longitude,
 
@@ -72,22 +72,13 @@ deduplicated as (
     ) = 1
 ),
 
-with_metier as (
+classified as (
     select *,
-        -- Classification métier
-        case
-            when REGEXP_CONTAINS(intitule, r'data\s+engineer|ing[eé]nieur\s+data|d[eé]veloppeur\s+data|data\s+engineering|ing[eé]nieur\s+de\s+donn[ée]es|data\s+ing[eé]nieur|dceo\s+engineer|data\s+cent(er|re)\s+engineering\s+operations') then 'data_engineer'
-            when REGEXP_CONTAINS(intitule, r'architecte\s+data|data\s+architect|architecte\s+de\s+donn[ée]es') then 'data_architect'
-            
-            when REGEXP_CONTAINS(intitule, r'data\s+analyst|analyste\s+data|business\s+data\s+analyst|data\s+product\s+analyst|analyste\s+de\s+donn[ée]es') then 'data_analyst'
-            when REGEXP_CONTAINS(intitule, r'(?:d[eé]veloppeur|analyste|consultant|ing[eé]nieur)\s+(?:bi|d[eé]cisionnel|business\s+intelligence)|(?:bi|d[eé]cisionnel|business\s+intelligence)\s+(?:d[eé]veloppeur|analyste|consultant|ing[eé]nieur)|power\s*bi|d[eé]veloppeur\s+bi|\bbi\b\s+(?:analyst|developer)') then 'bi_decisionnel'
-            when REGEXP_CONTAINS(intitule, r'mlops|ml\s+engineer|machine\s+learning\s+engineer|ing[eé]nieur\s+(machine\s+learning|ml)') then 'ml_engineer'
-            when REGEXP_CONTAINS(intitule, r'(?i)data\s+scientist') then 'data_scientist'
-            else 'autre_it'
-        end as categorie_metier,
-        -- Flag métier data
-        (REGEXP_CONTAINS(intitule, r'(?i)data') 
-         or REGEXP_CONTAINS(intitule, r'(?i)ml|scientist|engineer|analyst')) as is_metier_data
+        -- Classification métier via macro D85 (homogène Adzuna ↔ FT)
+        {{ classify_categorie_metier('titre') }} as categorie_metier,
+        -- Filet large D89 — volontairement plus permissif que categorie_metier
+        (REGEXP_CONTAINS(titre, r'(?i)data') 
+         or REGEXP_CONTAINS(titre, r'(?i)ml|scientist|engineer|analyst')) as is_metier_data
     from deduplicated
 ),
 
@@ -98,8 +89,10 @@ enhanced as (
             when code_commune is not null and length(cast(code_commune as string)) >= 2
                 then substr(cast(code_commune as string), 1, 
                      case when cast(code_commune as string) >= '97' then 3 else 2 end)
-            else regexp_extract(libelle_lieu, r'^(\d{2,3})')
+            else regexp_extract(localisation_libelle, r'^(\d{2,3})')
         end as code_departement,
+
+
 
         case
             when experience_exige = 'D' then null
@@ -110,10 +103,10 @@ enhanced as (
 
         case
             when salaire_periodicite = 'annuel' then salaire_min_euros
-            when salaire_periodicite = 'mensuel' and salaire_min_euros > 10000 then salaire_min_euros
-            when salaire_periodicite = 'mensuel' then salaire_min_euros * coalesce(salaire_nb_mois, 12)
-            when salaire_periodicite = 'horaire' and salaire_min_euros > 100 then salaire_min_euros
-            when salaire_periodicite = 'horaire' then salaire_min_euros * 1607
+            when salaire_periodicite = 'mensuel' and coalesce(salaire_min_euros, salaire_max_euros) > 10000 then coalesce(salaire_min_euros, salaire_max_euros)
+            when salaire_periodicite = 'mensuel' then coalesce(salaire_min_euros, salaire_max_euros) * coalesce(salaire_nb_mois, 12)
+            when salaire_periodicite = 'horaire' and coalesce(salaire_min_euros, salaire_max_euros) > 100 then coalesce(salaire_min_euros, salaire_max_euros)
+            when salaire_periodicite = 'horaire' then coalesce(salaire_min_euros, salaire_max_euros) * 1607
             else null
         end as salaire_annuel_min,
 
@@ -124,14 +117,19 @@ enhanced as (
             when salaire_periodicite = 'horaire' and salaire_min_euros > 100 then coalesce(salaire_max_euros, salaire_min_euros)
             when salaire_periodicite = 'horaire' then coalesce(salaire_max_euros, salaire_min_euros) * 1607
             else null
-        end as salaire_annuel_max
-    from with_metier
+        end as salaire_annuel_max,
+
+        -- D81 — flag de confort sur la cible métier projet
+        (categorie_metier = 'data_engineer') as is_data_engineer
+    from classified
 ),
 
 final_flags as (
     select *,
-        -- Maintenant salaire_annuel_min est disponible car on "vient de" enhanced
-        (salaire_annuel_min < 15000 or salaire_annuel_min = 0) as is_salaire_aberrant,
+        -- D86 A.5 — borne haute 250k ajoutée (validation empirique 2026-05-07)
+        (salaire_annuel_min < 15000 
+         or salaire_annuel_min = 0 
+         or salaire_annuel_max > 250000) as is_salaire_aberrant,
 
         (salaire_periodicite = 'mensuel' and salaire_min_euros > 10000) 
         or (salaire_periodicite = 'horaire' and salaire_min_euros > 100) as is_salaire_requalifie,
@@ -144,5 +142,5 @@ final_flags as (
     from enhanced
 )
 
-select *
+select * except(_ingestion_date)
 from final_flags

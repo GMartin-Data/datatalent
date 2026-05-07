@@ -3,13 +3,28 @@ version: 2
 models:
   - name: stg_france_travail__offres
     description: "Table staging des offres France Travail (JSON → tabulaire)"
+    
+    tests:
+      - dbt_utils.expression_is_true:
+          expression: >
+            NOT (
+              code_commune BETWEEN '75101' AND '75120'
+              OR code_commune BETWEEN '69381' AND '69389'
+              OR code_commune BETWEEN '13201' AND '13216'
+            )
+          config:
+            severity: warn
+            
+      - dbt_utils.expression_is_true:
+          expression: "is_data_engineer = (categorie_metier = 'data_engineer')"
+
     columns:
       - name: offre_id
         tests:
           - not_null
           - unique
 
-      - name: intitule
+      - name: titre
         tests:
           - not_null
 
@@ -25,8 +40,7 @@ models:
         tests:
           - not_null
           - accepted_values:
-              arguments:
-                values: ['france_travail']
+              values: ['france_travail']
               config:
                 severity: warn
 
@@ -34,8 +48,7 @@ models:
         tests:
           - not_null
           - accepted_values:
-              arguments:
-                values: ['CDI', 'CDD', 'MIS', 'LIB', 'CCE', 'SAI', 'DDI', 'FRA']
+              values: ['CDI', 'CDD', 'MIS', 'LIB', 'CCE', 'SAI', 'DDI', 'FRA']
               config:
                 severity: warn
 
@@ -43,35 +56,33 @@ models:
         tests:
           - not_null
           - accepted_values:
-              arguments:
-                values: ['D', 'E']
+              values: ['D', 'E']
               config:
                 severity: warn
 
       - name: categorie_metier
         tests:
           - accepted_values:
-              arguments:
-                values: [
-                  'data_engineer',
-                  'data_analyst',
-                  'data_architect',
-                  'bi_decisionnel',
-                  'ml_engineer',
-                  'data_scientist',
-                  'autre_it'
-                ]
+              values: [
+                'data_engineer',
+                'data_analyst',
+                'data_architect',
+                'bi_decisionnel',
+                'ml_engineer',
+                'data_scientist',
+                'autre_it'
+              ]
               config:
                 severity: warn
 
       - name: salaire_periodicite
         tests:
           - accepted_values:
-              arguments:
-                values: ['annuel', 'mensuel', 'horaire']
-                quote: true
+              values: ['annuel', 'mensuel', 'horaire']
+              quote: true
               config:
                 severity: warn
+                where: "salaire_periodicite IS NOT NULL"
 
       - name: code_departement
         tests:
@@ -80,8 +91,9 @@ models:
       - name: code_commune
         tests:
           - relationships:
-              arguments:
-                to: ref('stg_geo__communes')
-                field: code
+              to: ref('stg_geo__communes')
+              field: code
               config:
                 severity: warn
+
+      - name: is_data_engineer
