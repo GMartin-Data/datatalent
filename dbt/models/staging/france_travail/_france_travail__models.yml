@@ -76,8 +76,6 @@ models:
           - accepted_values:
               arguments:
                 values: ["france_travail"]
-              config:
-                severity: warn
 
       # --- Contrat ---
       - name: type_contrat
