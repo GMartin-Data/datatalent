@@ -18,7 +18,7 @@ models:
       construction. Cohérent avec D74 (URSSAF).
       Alimente int_offres_enrichies via UNION ALL avec stg_adzuna__offres.
 
-    tests:
+    data_tests:
       - dbt_utils.expression_is_true:
           arguments:
             expression: >
@@ -38,13 +38,13 @@ models:
       # --- Identité ---
       - name: offre_id
         description: Identifiant unique France Travail (renommé depuis id).
-        tests:
+        data_tests:
           - not_null
           - unique
 
       - name: date_creation
         description: Date de publication originale (renommée depuis dateCreation, castée en TIMESTAMP).
-        tests:
+        data_tests:
           - not_null
 
       - name: date_actualisation
@@ -52,7 +52,7 @@ models:
 
       - name: titre
         description: Intitulé de l'offre (renommé depuis intitule, D86 A.1 — harmonisation avec Adzuna).
-        tests:
+        data_tests:
           - not_null
 
       - name: description
@@ -60,7 +60,7 @@ models:
 
       - name: rome_code
         description: "Code ROME (5 caractères, ex: M1805). Référentiel métier France Travail."
-        tests:
+        data_tests:
           - not_null
 
       - name: rome_libelle
@@ -71,7 +71,7 @@ models:
 
       - name: source
         description: Constante 'france_travail' — discriminant pour UNION ALL avec Adzuna dans int_offres_enrichies.
-        tests:
+        data_tests:
           - not_null
           - accepted_values:
               arguments:
@@ -84,7 +84,7 @@ models:
         description: >
           Type de contrat (8 codes étendus D88) : CDI, CDD, MIS, LIB, CCE, SAI, DDI, FRA.
           DDI (CDD Insertion) et FRA (Franchise) ajoutés suite à apparition en raw.
-        tests:
+        data_tests:
           - not_null
           - accepted_values:
               arguments:
@@ -97,7 +97,7 @@ models:
 
       - name: experience_exige
         description: "Code expérience : D (débutant accepté) ou E (expérience exigée)."
-        tests:
+        data_tests:
           - not_null
           - accepted_values:
               arguments:
@@ -128,7 +128,7 @@ models:
         description: >
           Périodicité extraite de salaire.libelle par regex : 'annuel', 'mensuel', 'horaire', NULL.
           Naming aligné Adzuna ↔ FT (D86 A.3).
-        tests:
+        data_tests:
           - accepted_values:
               arguments:
                 values: ["annuel", "mensuel", "horaire"]
@@ -171,7 +171,7 @@ models:
           Code INSEE de la commune (LPAD à 5 caractères + normalisation PLM D87).
           Pour Paris/Lyon/Marseille, les arrondissements sont rabattus sur le code central
           (75056 / 69123 / 13055). Clé de jointure avec stg_geo__communes.code.
-        tests:
+        data_tests:
           - relationships:
               arguments:
                 to: ref('stg_geo__communes')
@@ -183,7 +183,7 @@ models:
         description: >
           Code département (2 caractères en métropole, 3 pour DOM ≥ '97'). Dérivé de
           code_commune en priorité, fallback regex sur localisation_libelle. 100% de couverture.
-        tests:
+        data_tests:
           - not_null
 
       - name: localisation_libelle
@@ -218,7 +218,7 @@ models:
         description: >
           Classification métier dérivée du titre via macro classify_categorie_metier (D8-bis, D85).
           Macro factorisée Adzuna ↔ FT pour garantir l'homogénéité de l'UNION ALL aval.
-        tests:
+        data_tests:
           - accepted_values:
               arguments:
                 values:
