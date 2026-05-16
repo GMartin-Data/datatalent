@@ -3,13 +3,20 @@ version: 2
 models:
   - name: stg_france_travail__offres
     description: >
-      Table staging des offres France Travail (JSON → tabulaire).
+      Table staging des offres France Travail (JSON → tabulaire). Modèle pilote du pipeline
+      analytique, dédupliquée par offre_id via _ingestion_date (D19).
+      Classification métier via macro classify_categorie_metier (D8-bis, D85).
+      Salaires normalisés en annuel par parsing regex de salaire.libelle (D41) avec
+      requalification mensuel > 10k€ / horaire > 100€ traités comme annuels.
+      Flag is_salaire_aberrant étendu à la borne haute 250k€ (D42, D86 A.5).
       Normalisation PLM (D87) : les arrondissements de Paris (75101-75120),
       Lyon (69381-69389) et Marseille (13201-13216) sont rabattus sur les codes
-      centraux INSEE (75056, 69123, 13055). Conséquence sémantique : pour ces
+      centraux INSEE (75056, 69123, 13055). Code commune LPAD à 5 caractères
+      pour normaliser les codes commençant par 0. Conséquence sémantique : pour ces
       3 communes, code_commune représente un agrégat reconstitué, pas une entité
       INSEE native — l'analyse fine au niveau arrondissement est perdue par
       construction. Cohérent avec D74 (URSSAF).
+      Alimente int_offres_enrichies via UNION ALL avec stg_adzuna__offres.
 
     tests:
       - dbt_utils.expression_is_true:
@@ -28,24 +35,42 @@ models:
             expression: "is_data_engineer = (categorie_metier = 'data_engineer')"
 
     columns:
+      # --- Identité ---
       - name: offre_id
+        description: Identifiant unique France Travail (renommé depuis id).
         tests:
           - not_null
           - unique
 
-      - name: titre
+      - name: date_creation
+        description: Date de publication originale (renommée depuis dateCreation, castée en TIMESTAMP).
         tests:
           - not_null
+
+      - name: date_actualisation
+        description: Date de dernière mise à jour de l'offre (renommée depuis dateActualisation, castée en TIMESTAMP).
+
+      - name: titre
+        description: Intitulé de l'offre (renommé depuis intitule, D86 A.1 — harmonisation avec Adzuna).
+        tests:
+          - not_null
+
+      - name: description
+        description: Description textuelle complète de l'offre.
 
       - name: rome_code
+        description: "Code ROME (5 caractères, ex: M1805). Référentiel métier France Travail."
         tests:
           - not_null
 
-      - name: date_creation
-        tests:
-          - not_null
+      - name: rome_libelle
+        description: Libellé associé au code ROME.
+
+      - name: nombre_postes
+        description: Nombre de postes à pourvoir (casté en INT64).
 
       - name: source
+        description: Constante 'france_travail' — discriminant pour UNION ALL avec Adzuna dans int_offres_enrichies.
         tests:
           - not_null
           - accepted_values:
@@ -54,7 +79,11 @@ models:
               config:
                 severity: warn
 
+      # --- Contrat ---
       - name: type_contrat
+        description: >
+          Type de contrat (8 codes étendus D88) : CDI, CDD, MIS, LIB, CCE, SAI, DDI, FRA.
+          DDI (CDD Insertion) et FRA (Franchise) ajoutés suite à apparition en raw.
         tests:
           - not_null
           - accepted_values:
@@ -63,7 +92,11 @@ models:
               config:
                 severity: warn
 
+      - name: type_contrat_libelle
+        description: Libellé du type de contrat (contient parfois la durée, 51+ valeurs distinctes).
+
       - name: experience_exige
+        description: "Code expérience : D (débutant accepté) ou E (expérience exigée)."
         tests:
           - not_null
           - accepted_values:
@@ -72,7 +105,119 @@ models:
               config:
                 severity: warn
 
+      - name: experience_libelle
+        description: "Libellé brut de l'expérience (ex: '2 An(s)', '6 Mois'). Source du parsing experience_duree_annees."
+
+      - name: temps_travail
+        description: "Temps de travail (depuis dureeTravailLibelleConverti) : Temps plein, Temps partiel, NULL."
+
+      - name: is_alternance
+        description: TRUE si l'offre est en alternance (casté depuis alternance).
+
+      - name: qualification_code
+        description: Code qualification (1-9). NULL si absent (~60% des cas).
+
+      - name: qualification_libelle
+        description: Libellé qualification associé au code.
+
+      # --- Salaire ---
+      - name: salaire_commentaire
+        description: Texte libre lié au salaire (pas de parsing aval).
+
+      - name: salaire_periodicite
+        description: >
+          Périodicité extraite de salaire.libelle par regex : 'annuel', 'mensuel', 'horaire', NULL.
+          Naming aligné Adzuna ↔ FT (D86 A.3).
+        tests:
+          - accepted_values:
+              arguments:
+                values: ["annuel", "mensuel", "horaire"]
+                quote: true
+              config:
+                severity: warn
+                where: "salaire_periodicite IS NOT NULL"
+
+      - name: salaire_min_euros
+        description: Montant bas brut extrait de salaire.libelle. Unité dictée par salaire_periodicite.
+
+      - name: salaire_max_euros
+        description: Montant haut brut extrait de salaire.libelle. NULL si valeur unique.
+
+      - name: salaire_nb_mois
+        description: "Nombre de mois extrait de salaire.libelle (ex: 'sur 13 mois'). NULL si absent — fallback × 12 dans le calcul annualisé."
+
+      - name: salaire_annuel_min
+        description: >
+          Salaire minimum annualisé (D41). Requalification : mensuel > 10k€ et horaire > 100€
+          traités comme déjà annuels. Sinon × multiplicateur (salaire_nb_mois ou 12, ou 1607 heures pour horaire).
+          NULL si salaire absent.
+
+      - name: salaire_annuel_max
+        description: >
+          Salaire maximum annualisé (D41). Même logique que salaire_annuel_min.
+          coalesce(salaire_max_euros, salaire_min_euros) pour symétrie quand seul le min est renseigné.
+
+      - name: is_salaire_aberrant
+        description: >
+          TRUE si salaire_annuel_min < 15k€, = 0, ou salaire_annuel_max > 250k€ (D42 +
+          borne haute D86 A.5 — validation empirique 2026-05-07 : 2 cas > 250k aberrants).
+
+      - name: is_salaire_requalifie
+        description: TRUE si salaire requalifié comme annuel (mensuel > 10k€ ou horaire > 100€, D41).
+
+      # --- Géographie ---
+      - name: code_commune
+        description: >
+          Code INSEE de la commune (LPAD à 5 caractères + normalisation PLM D87).
+          Pour Paris/Lyon/Marseille, les arrondissements sont rabattus sur le code central
+          (75056 / 69123 / 13055). Clé de jointure avec stg_geo__communes.code.
+        tests:
+          - relationships:
+              arguments:
+                to: ref('stg_geo__communes')
+                field: code
+              config:
+                severity: warn
+
+      - name: code_departement
+        description: >
+          Code département (2 caractères en métropole, 3 pour DOM ≥ '97'). Dérivé de
+          code_commune en priorité, fallback regex sur localisation_libelle. 100% de couverture.
+        tests:
+          - not_null
+
+      - name: localisation_libelle
+        description: Libellé textuel du lieu de travail (renommé depuis lieuTravail.libelle, D86 A.2 — harmonisation avec Adzuna).
+
+      - name: latitude
+        description: Latitude GPS (FLOAT64). NULL si lieuTravail.latitude absent (~11%).
+
+      - name: longitude
+        description: Longitude GPS (FLOAT64). NULL si lieuTravail.longitude absent (~11%).
+
+      # --- Secteur ---
+      - name: code_naf
+        description: "Code NAF de l'établissement (ex: 62.01Z). NULL si absent (~52%)."
+
+      - name: secteur_activite_libelle
+        description: Libellé du secteur d'activité associé au code NAF.
+
+      - name: tranche_effectif
+        description: Tranche d'effectif de l'établissement. NULL si absent (~84%).
+
+      - name: entreprise_nom
+        description: "Nom de l'entreprise (depuis entreprise.nom). NULL si absent (~64%)."
+
+      - name: is_intermediaire
+        description: >
+          TRUE si code_naf ∈ ('78.10Z', '78.20Z') — intermédiaires de l'emploi (ESN, agences intérim).
+          NULL si code_naf absent (pas FALSE — préserve l'incertitude).
+
+      # --- Classification métier ---
       - name: categorie_metier
+        description: >
+          Classification métier dérivée du titre via macro classify_categorie_metier (D8-bis, D85).
+          Macro factorisée Adzuna ↔ FT pour garantir l'homogénéité de l'UNION ALL aval.
         tests:
           - accepted_values:
               arguments:
@@ -89,27 +234,18 @@ models:
               config:
                 severity: warn
 
-      - name: salaire_periodicite
-        tests:
-          - accepted_values:
-              arguments:
-                values: ["annuel", "mensuel", "horaire"]
-                quote: true
-              config:
-                severity: warn
-                where: "salaire_periodicite IS NOT NULL"
-
-      - name: code_departement
-        tests:
-          - not_null
-
-      - name: code_commune
-        tests:
-          - relationships:
-              arguments:
-                to: ref('stg_geo__communes')
-                field: code
-              config:
-                severity: warn
+      - name: is_metier_data
+        description: >
+          Filet large (D89) — TRUE si le titre contient 'data' ou un mot-clé métier
+          (ml, scientist, engineer, analyst). Volontairement plus permissif que
+          categorie_metier pour capter les offres qui touchent à la data au sens large.
+          Symétrie avec Adzuna.
 
       - name: is_data_engineer
+        description: "Flag métier cible projet (D81) : categorie_metier = 'data_engineer'. Symétrie avec Adzuna. Cohérence vérifiée par test croisé top-level."
+
+      - name: experience_duree_annees
+        description: >
+          Durée d'expérience en années (FLOAT64), parsée depuis experience_libelle.
+          NULL si experience_exige = 'D' ou si le libellé ne contient pas de durée numérique
+          (~45% des cas). Conversion 'X Mois' → X / 12.
