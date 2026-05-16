@@ -2,21 +2,30 @@ version: 2
 
 models:
   - name: stg_france_travail__offres
-    description: "Table staging des offres France Travail (JSON → tabulaire)"
-    
+    description: >
+      Table staging des offres France Travail (JSON → tabulaire).
+      Normalisation PLM (D87) : les arrondissements de Paris (75101-75120),
+      Lyon (69381-69389) et Marseille (13201-13216) sont rabattus sur les codes
+      centraux INSEE (75056, 69123, 13055). Conséquence sémantique : pour ces
+      3 communes, code_commune représente un agrégat reconstitué, pas une entité
+      INSEE native — l'analyse fine au niveau arrondissement est perdue par
+      construction. Cohérent avec D74 (URSSAF).
+
     tests:
       - dbt_utils.expression_is_true:
-          expression: >
-            NOT (
-              code_commune BETWEEN '75101' AND '75120'
-              OR code_commune BETWEEN '69381' AND '69389'
-              OR code_commune BETWEEN '13201' AND '13216'
-            )
+          arguments:
+            expression: >
+              NOT (
+                code_commune BETWEEN '75101' AND '75120'
+                OR code_commune BETWEEN '69381' AND '69389'
+                OR code_commune BETWEEN '13201' AND '13216'
+              )
           config:
             severity: warn
-            
+
       - dbt_utils.expression_is_true:
-          expression: "is_data_engineer = (categorie_metier = 'data_engineer')"
+          arguments:
+            expression: "is_data_engineer = (categorie_metier = 'data_engineer')"
 
     columns:
       - name: offre_id
@@ -40,7 +49,8 @@ models:
         tests:
           - not_null
           - accepted_values:
-              values: ['france_travail']
+              arguments:
+                values: ["france_travail"]
               config:
                 severity: warn
 
@@ -48,7 +58,8 @@ models:
         tests:
           - not_null
           - accepted_values:
-              values: ['CDI', 'CDD', 'MIS', 'LIB', 'CCE', 'SAI', 'DDI', 'FRA']
+              arguments:
+                values: ["CDI", "CDD", "MIS", "LIB", "CCE", "SAI", "DDI", "FRA"]
               config:
                 severity: warn
 
@@ -56,30 +67,34 @@ models:
         tests:
           - not_null
           - accepted_values:
-              values: ['D', 'E']
+              arguments:
+                values: ["D", "E"]
               config:
                 severity: warn
 
       - name: categorie_metier
         tests:
           - accepted_values:
-              values: [
-                'data_engineer',
-                'data_analyst',
-                'data_architect',
-                'bi_decisionnel',
-                'ml_engineer',
-                'data_scientist',
-                'autre_it'
-              ]
+              arguments:
+                values:
+                  [
+                    "data_engineer",
+                    "data_analyst",
+                    "data_architect",
+                    "bi_decisionnel",
+                    "ml_engineer",
+                    "data_scientist",
+                    "autre_it",
+                  ]
               config:
                 severity: warn
 
       - name: salaire_periodicite
         tests:
           - accepted_values:
-              values: ['annuel', 'mensuel', 'horaire']
-              quote: true
+              arguments:
+                values: ["annuel", "mensuel", "horaire"]
+                quote: true
               config:
                 severity: warn
                 where: "salaire_periodicite IS NOT NULL"
@@ -91,8 +106,9 @@ models:
       - name: code_commune
         tests:
           - relationships:
-              to: ref('stg_geo__communes')
-              field: code
+              arguments:
+                to: ref('stg_geo__communes')
+                field: code
               config:
                 severity: warn
 
