@@ -101,6 +101,10 @@ enhanced as (
             else null
         end as experience_duree_annees,
 
+        -- Asymétrie min/max tolérée : salaire_annuel_min utilise salaire_min_euros brut,
+        -- salaire_annuel_max utilise coalesce(salaire_max_euros, salaire_min_euros).
+        -- Validation empirique 2026-05-16 : 0/3330 offres avec salaire concernées —
+        -- le pattern FT capture toujours le min en première position. Pas de fix défensif.
         case
             when salaire_periodicite = 'annuel' then salaire_min_euros
             when salaire_periodicite = 'mensuel' and coalesce(salaire_min_euros, salaire_max_euros) > 10000 then coalesce(salaire_min_euros, salaire_max_euros)
