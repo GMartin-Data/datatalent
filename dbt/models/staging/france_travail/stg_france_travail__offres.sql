@@ -146,5 +146,5 @@ final_flags as (
     from enhanced
 )
 
-select * except(_ingestion_date)
+select * except(_ingestion_date, salaire_libelle)
 from final_flags
