@@ -6,4 +6,7 @@ sources:
     schema: raw
     tables:
       - name: adzuna
-        description: Offres data engineer Adzuna FR (WRITE_APPEND, déduplication en staging)
+        description: >
+          Offres data engineer Adzuna FR.
+          Source : api.adzuna.com, requête what=data+engineer, pays fr.
+          WRITE_APPEND hebdomadaire, déduplication en staging.

@@ -6,4 +6,7 @@ sources:
     schema: raw
     tables:
       - name: france_travail
-        description: Offres d'emploi IT France Travail (WRITE_APPEND, déduplication en staging)
+        description: >
+          Offres d'emploi IT France Travail.
+          Source : api.francetravail.io, 4 codes ROME (M1801, M1805, M1806, M1810).
+          WRITE_APPEND hebdomadaire, déduplication en staging.

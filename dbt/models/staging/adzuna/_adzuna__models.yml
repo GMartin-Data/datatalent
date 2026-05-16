@@ -6,8 +6,8 @@ models:
       Offres d'emploi issues d'Adzuna.
       Modèle de staging mono-source dédupliqué par offre_id via _ingestion_date.
       Aucune ligne n'est filtrée à ce stade : les colonnes de classification et de flag
-      permettent le tri en intermediate.
-
+      permettent le tri en intermediate. Colonnes renommées à l'ingestion (D39).
+      Alimente int_offres_enrichies via UNION ALL avec stg_france_travail__offres.
     columns:
       - name: offre_id
         description: Identifiant unique Adzuna, casté en STRING pour harmonisation aval.
@@ -21,7 +21,7 @@ models:
           - not_null
 
       - name: description
-        description: Description textuelle de l'offre.
+        description: Snippet tronqué de la description, pas le texte intégral.
 
       - name: date_creation
         description: Date de création de l'offre côté source.
@@ -34,7 +34,7 @@ models:
           - not_null
           - accepted_values:
               arguments:
-                values: ['adzuna']
+                values: ["adzuna"]
 
       - name: categorie_metier
         description: >
@@ -46,13 +46,13 @@ models:
           - accepted_values:
               arguments:
                 values:
-                  - 'data_engineer'
-                  - 'data_analyst'
-                  - 'data_architect'
-                  - 'bi_decisionnel'
-                  - 'ml_engineer'
-                  - 'data_scientist'
-                  - 'autre_it'
+                  - "data_engineer"
+                  - "data_analyst"
+                  - "data_architect"
+                  - "bi_decisionnel"
+                  - "ml_engineer"
+                  - "data_scientist"
+                  - "autre_it"
 
       - name: is_metier_data
         description: >
@@ -72,7 +72,7 @@ models:
                 expression: "= (categorie_metier = 'data_engineer')"
 
       - name: entreprise_nom
-        description: Nom de l'entreprise.
+        description: Nom commercial de l'entreprise (pas raison sociale).
 
       - name: localisation_libelle
         description: Libellé textuel de localisation.
@@ -102,12 +102,14 @@ models:
         data_tests:
           - accepted_values:
               arguments:
-                values: ['declare']
+                values: ["declare"]
               config:
                 where: "source_salaire IS NOT NULL"
 
       - name: salaire_est_estime
-        description: Indicateur source Adzuna de salaire estimé ou non, typé en INT64 via safe_cast.
+        description: >
+          Indicateur source Adzuna. Code mort défensif — 100% à '0' sur FR à date.
+          Typé en INT64 via safe_cast (D82).
 
       - name: salaire_periodicite
         description: >
@@ -118,7 +120,7 @@ models:
         data_tests:
           - accepted_values:
               arguments:
-                values: ['annuel', 'mensuel']
+                values: ["annuel", "mensuel"]
               config:
                 where: "salaire_periodicite IS NOT NULL"
 
@@ -146,10 +148,12 @@ models:
         description: Temps de travail remonté par Adzuna.
 
       - name: categorie_tag
-        description: Catégorie Adzuna.
+        description: Secteur de l'entreprise (pas métier). Proxy sectoriel grossier en l'absence de code NAF.
 
       - name: categorie_libelle
         description: Libellé de catégorie Adzuna.
 
       - name: redirect_url
-        description: URL de redirection de l'offre.
+        description: >
+          URL de redirection vers la fiche Adzuna. Traçabilité — non exploitable pour
+          déduplication (toutes pointent vers adzuna.fr).
