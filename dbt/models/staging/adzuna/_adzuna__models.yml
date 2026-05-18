@@ -142,10 +142,31 @@ models:
           ou salaire mensuel * 12 si elle est inférée comme mensuelle.
 
       - name: type_contrat
-        description: Type de contrat remonté par Adzuna.
+        description: >
+          Type de contrat harmonisé sur le vocabulaire FT (D90).
+          Mapping en staging via CTE harmonized :
+          permanent → CDI, contract → CDD, autre → NULL.
+          Asymétrie de couverture assumée vs FT (D88, 8 codes) :
+          Adzuna n'émet que 2 réalités contractuelles, le test 
+          n'enum que les codes effectivement produits.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["CDI", "CDD"]
+              config:
+                where: "type_contrat IS NOT NULL"
 
       - name: temps_travail
-        description: Temps de travail remonté par Adzuna.
+        description: >
+          Temps de travail harmonisé sur le vocabulaire FT (D90).
+          Mapping en staging via CTE harmonized :
+          full_time → Temps plein, part_time → Temps partiel, autre → NULL.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["Temps plein", "Temps partiel"]
+              config:
+                where: "temps_travail IS NOT NULL"
 
       - name: categorie_tag
         description: Secteur de l'entreprise (pas métier). Proxy sectoriel grossier en l'absence de code NAF.
