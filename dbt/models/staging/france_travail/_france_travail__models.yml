@@ -80,15 +80,17 @@ models:
       # --- Contrat ---
       - name: type_contrat
         description: >
-          Type de contrat (8 codes étendus D88) : CDI, CDD, MIS, LIB, CCE, SAI, DDI, FRA.
-          DDI (CDD Insertion) et FRA (Franchise) ajoutés suite à apparition en raw.
+          Code contrat France Travail. Valeur source `typeContrat` propagée
+          tel quel. Format de nomenclature : 3 lettres majuscules. 8 codes
+          historiquement connus (D88) : CDI, CDD, MIS, LIB, CCE, SAI, DDI,
+          FRA. Élargissements récurrents constatés (D92) — le test contrôle
+          désormais le format de nomenclature, pas l'énumération exhaustive.
         data_tests:
-          - not_null
-          - accepted_values:
+          - dbt_utils.expression_is_true:
               arguments:
-                values: ["CDI", "CDD", "MIS", "LIB", "CCE", "SAI", "DDI", "FRA"]
+                expression: "REGEXP_CONTAINS(type_contrat, r'^[A-Z]{3}$')"
               config:
-                severity: warn
+                where: "type_contrat IS NOT NULL"
 
       - name: type_contrat_libelle
         description: Libellé du type de contrat (contient parfois la durée, 51+ valeurs distinctes).
