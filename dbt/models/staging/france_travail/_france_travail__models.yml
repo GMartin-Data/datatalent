@@ -155,6 +155,18 @@ models:
           Salaire maximum annualisé (D41). Même logique que salaire_annuel_min.
           coalesce(salaire_max_euros, salaire_min_euros) pour symétrie quand seul le min est renseigné.
 
+      - name: source_salaire
+        description: >
+          Indicateur de présence d'un salaire dans l'offre source. 'declare'
+          si salaire_annuel_min est non-NULL, NULL sinon. Émis au staging pour
+          symétrie complète avec stg_adzuna__offres (alignement D90).
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["declare"]
+              config:
+                where: "source_salaire IS NOT NULL"
+
       - name: is_salaire_aberrant
         description: >
           TRUE si salaire_annuel_min < 15k€, = 0, ou salaire_annuel_max > 250k€ (D42 +

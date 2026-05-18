@@ -138,6 +138,13 @@ final_flags as (
         (salaire_periodicite = 'mensuel' and salaire_min_euros > 10000) 
         or (salaire_periodicite = 'horaire' and salaire_min_euros > 100) as is_salaire_requalifie,
 
+        -- Alignement D90 — source_salaire émis au staging pour symétrie complète
+        -- avec stg_adzuna__offres. Propagation pure en intermediate.
+        case
+            when salaire_annuel_min is not null then 'declare'
+            else null
+        end as source_salaire,
+
         case 
             when code_naf in ('78.10Z', '78.20Z') then true
             when code_naf is null then null
