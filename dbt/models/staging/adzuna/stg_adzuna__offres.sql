@@ -8,9 +8,10 @@
 -- 2. Conserver la version la plus récente selon _ingestion_date
 -- 3. Normaliser les types et calculer les colonnes utiles
 -- 4. Harmoniser les valeurs catégorielles Adzuna ↔ FT (D90)
--- 5. Enrichir les salaires avec une périodicité inférée
--- 6. Classifier les intitulés de poste via macro projet
--- 7. Ajouter les flags métiers et conserver les colonnes salaire
+-- 5. Enrichir les salaires avec une périodicité inférée (D77)
+-- 6. Calculer le flag is_salaire_aberrant aligné sur FT (D91)
+-- 7. Classifier les intitulés de poste via macro projet
+-- 8. Ajouter les flags métiers et conserver les colonnes salaire
 --
 -- Remarque :
 -- La classification métier est centralisée dans la macro
@@ -153,7 +154,7 @@ salary_enriched as (
     -- ========================================================
     -- Étape 5 : inférence prudente de la périodicité salaire
     --
-    -- Règles retenues :
+    -- Règles retenues (D77) :
     -- - annuel : entre 15k et 250k
     -- - mensuel : entre 1k et 14 999
     -- - sinon : NULL
@@ -191,10 +192,35 @@ salary_enriched as (
 
 ),
 
+salary_flags as (
+
+    -- ========================================================
+    -- Étape 6 : flag is_salaire_aberrant (D91)
+    --
+    -- Seuils alignés sur D86 A.5 côté FT pour garantir la
+    -- comparabilité inter-sources du flag :
+    --   - aberrant_bas : salaire_annuel_min < 15000 ou = 0
+    --   - aberrant_haut : salaire_annuel_max > 250000
+    --
+    -- NULL handling implicite : si les deux salaires sont
+    -- NULL, le booléen ternaire SQL propage NULL.
+    -- Symétrique du pattern final_flags côté FT.
+    -- ========================================================
+    select
+        *,
+
+        (salaire_annuel_min < 15000
+         or salaire_annuel_min = 0
+         or salaire_annuel_max > 250000) as is_salaire_aberrant
+
+    from salary_enriched
+
+),
+
 classified as (
 
     -- ========================================================
-    -- Étape 6 : classification métier à partir du titre
+    -- Étape 7 : classification métier à partir du titre
     --
     -- La logique est centralisée dans la macro projet
     -- classify_categorie_metier.
@@ -203,14 +229,14 @@ classified as (
         *,
         {{ classify_categorie_metier('titre') }} as categorie_metier
 
-    from salary_enriched
+    from salary_flags
 
 ),
 
 final as (
 
     -- ========================================================
-    -- Étape 7 : ajout des flags métiers finaux
+    -- Étape 8 : ajout des flags métiers finaux
     -- + conservation des colonnes salaire enrichies
     --
     -- On ne filtre aucune ligne ici.
@@ -266,6 +292,7 @@ final as (
         is_salaire_periodicite_inferree,
         salaire_annuel_min,
         salaire_annuel_max,
+        is_salaire_aberrant,
 
         -- -------------------------------
         -- Contrat / catégorie
