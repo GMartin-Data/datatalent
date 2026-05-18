@@ -7,9 +7,10 @@
 -- 1. Dédupliquer les offres Adzuna par offre_id
 -- 2. Conserver la version la plus récente selon _ingestion_date
 -- 3. Normaliser les types et calculer les colonnes utiles
--- 4. Enrichir les salaires avec une périodicité inférée
--- 5. Classifier les intitulés de poste via macro projet
--- 6. Ajouter les flags métiers et conserver les colonnes salaire
+-- 4. Harmoniser les valeurs catégorielles Adzuna ↔ FT (D90)
+-- 5. Enrichir les salaires avec une périodicité inférée
+-- 6. Classifier les intitulés de poste via macro projet
+-- 7. Ajouter les flags métiers et conserver les colonnes salaire
 --
 -- Remarque :
 -- La classification métier est centralisée dans la macro
@@ -110,10 +111,47 @@ source_typed as (
 
 ),
 
+harmonized as (
+
+    -- ========================================================
+    -- Étape 4 : harmonisation des valeurs catégorielles
+    --           Adzuna ↔ FT (D90, extension de D80/D86)
+    --
+    -- Mappings sémantiques au staging, pas en intermediate :
+    -- - type_contrat : permanent → CDI, contract → CDD,
+    --                  autre → NULL (asymétrie de couverture
+    --                  Adzuna 2 codes vs FT 8 codes D88,
+    --                  cf. accepted_values côté YAML)
+    -- - temps_travail : full_time → Temps plein,
+    --                   part_time → Temps partiel, autre → NULL
+    --
+    -- Le NULL sur valeur source inconnue est volontaire —
+    -- pas de COALESCE masquant l'imprévu (parallèle d'esprit
+    -- avec D75 sur le BMO).
+    -- ========================================================
+    select
+        * except (type_contrat, temps_travail),
+
+        case
+            when type_contrat = 'permanent' then 'CDI'
+            when type_contrat = 'contract' then 'CDD'
+            else null
+        end as type_contrat,
+
+        case
+            when temps_travail = 'full_time' then 'Temps plein'
+            when temps_travail = 'part_time' then 'Temps partiel'
+            else null
+        end as temps_travail
+
+    from source_typed
+
+),
+
 salary_enriched as (
 
     -- ========================================================
-    -- Étape 4 : inférence prudente de la périodicité salaire
+    -- Étape 5 : inférence prudente de la périodicité salaire
     --
     -- Règles retenues :
     -- - annuel : entre 15k et 250k
@@ -149,14 +187,14 @@ salary_enriched as (
             else null
         end as salaire_annuel_max
 
-    from source_typed
+    from harmonized
 
 ),
 
 classified as (
 
     -- ========================================================
-    -- Étape 5 : classification métier à partir du titre
+    -- Étape 6 : classification métier à partir du titre
     --
     -- La logique est centralisée dans la macro projet
     -- classify_categorie_metier.
@@ -172,7 +210,7 @@ classified as (
 final as (
 
     -- ========================================================
-    -- Étape 6 : ajout des flags métiers finaux
+    -- Étape 7 : ajout des flags métiers finaux
     -- + conservation des colonnes salaire enrichies
     --
     -- On ne filtre aucune ligne ici.
