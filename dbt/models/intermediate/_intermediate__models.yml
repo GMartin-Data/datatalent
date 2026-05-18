@@ -81,11 +81,9 @@ models:
           (D90). NULL pour Adzuna quand valeur source absente ou hors
           mapping (70.6% Adzuna).
         data_tests:
-          - dbt_utils.expression_is_true:
+          - matches_regex:
               arguments:
-                expression: "REGEXP_CONTAINS(type_contrat, r'^[A-Z]{3}$')"
-              config:
-                where: "type_contrat IS NOT NULL"
+                pattern: "^[A-Z]{3}$"
 
       - name: experience_exige
         description: Niveau d'expérience exigé (D/E/S). FT only.
