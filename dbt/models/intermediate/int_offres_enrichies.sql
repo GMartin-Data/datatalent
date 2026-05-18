@@ -1,13 +1,51 @@
-WITH france_travail AS (
+-- ============================================================
+-- Modèle : int_offres_enrichies
+-- Couche : intermediate (matérialisé en `table` via dbt_project.yml — D52)
+--
+-- Objectif :
+-- 1. Unifier les offres France Travail et Adzuna via UNION ALL (D46)
+-- 2. Résoudre le code_departement Adzuna (departement_nom → code)
+-- 3. Enrichir avec les noms géographiques (commune, département,
+--    région, population) via jointures stg_geo__communes (chemin
+--    principal) et stg_geo__departements (fallback)
+--
+-- Principes (post-D90/D91) :
+-- - Intermediate minimaliste. Toutes les harmonisations inter-sources
+--   sont opérées au staging (D80 structure, D86 libellés/flags,
+--   D90 valeurs, D91 is_salaire_aberrant Adzuna).
+-- - Pas de filtrage de lignes — flags propagés pour filtrage en marts.
+-- - Pas de déduplication inter-sources (D46).
+-- - PLM transparent : remap arrondissements → commune centrale fait
+--   au staging FT (D87), pas ici.
+-- - SELECT explicites dans les CTE pré-UNION avec CAST(NULL AS <type>)
+--   pour les colonnes absentes d'un côté.
+-- - Pas de jointure stg_geo__regions : nom_region déjà dénormalisé
+--   dans stg_geo__departements.
+--
+-- Voir int-offres-enrichies.md (spec composant) pour les détails.
+-- ============================================================
 
-    SELECT
+with ft as (
+
+    -- ========================================================
+    -- CTE France Travail
+    --
+    -- Propagation pure depuis stg_france_travail__offres.
+    -- CAST(NULL AS BOOLEAN) pour is_salaire_periodicite_inferree
+    -- qui est Adzuna-only par construction (D86 A.4).
+    -- ========================================================
+    select
+        -- Identité
         offre_id,
-        intitule AS titre,
+        titre,
         description,
         date_creation,
         source,
+
+        -- Classification métier
         categorie_metier,
         is_metier_data,
+        is_data_engineer,
 
         -- Contrat
         type_contrat,
@@ -19,19 +57,18 @@ WITH france_travail AS (
         qualification_code,
         qualification_libelle,
 
-        -- Salaire
+        -- Salaire (normalisé annuel au staging — D86 A.5)
         salaire_annuel_min,
         salaire_annuel_max,
         is_salaire_aberrant,
-        CASE
-            WHEN salaire_annuel_min IS NOT NULL THEN 'declare'
-            ELSE NULL
-        END AS source_salaire,
+        is_salaire_requalifie,
+        cast(null as boolean)                       as is_salaire_periodicite_inferree,
+        source_salaire,
 
-        -- Géographie issue de l'offre
+        -- Géographie issue de l'offre (PLM remap fait au staging — D87)
         code_commune,
         code_departement,
-        libelle_lieu,
+        localisation_libelle                        as libelle_lieu,
         latitude,
         longitude,
 
@@ -46,123 +83,121 @@ WITH france_travail AS (
         rome_code,
         rome_libelle
 
-    FROM {{ ref('stg_france_travail__offres') }}
+    from {{ ref('stg_france_travail__offres') }}
 
 ),
 
-departements_lookup AS (
+adzuna as (
 
-    SELECT
-        code,
-        nom,
-        nom_region
-    FROM {{ ref('stg_geo__departements') }}
-
-),
-
-adzuna AS (
-
-    SELECT
+    -- ========================================================
+    -- CTE Adzuna
+    --
+    -- Propagation depuis stg_adzuna__offres + résolution du
+    -- code_departement via jointure textuelle sur le référentiel
+    -- géographique des départements (égalité stricte — 0 non-match
+    -- validé empiriquement 2026-05-18, YAGNI).
+    --
+    -- CAST(NULL AS <type>) pour les colonnes FT-only :
+    -- experience_*, nombre_postes, is_alternance, qualification_*,
+    -- code_commune, code_naf, secteur_*, tranche_effectif,
+    -- is_intermediaire, is_salaire_requalifie, rome_*.
+    -- ========================================================
+    select
+        -- Identité
         a.offre_id,
         a.titre,
         a.description,
         a.date_creation,
         a.source,
+
+        -- Classification métier
         a.categorie_metier,
         a.is_metier_data,
+        a.is_data_engineer,
 
-        -- Contrat harmonisé
-        CASE
-            WHEN a.type_contrat = 'permanent' THEN 'CDI'
-            WHEN a.type_contrat = 'contract' THEN 'CDD'
-            ELSE NULL
-        END AS type_contrat,
-        CAST(NULL AS STRING) AS experience_exige,
-        CAST(NULL AS FLOAT64) AS experience_duree_annees,
-        CASE
-            WHEN a.temps_travail = 'full_time' THEN 'Temps plein'
-            WHEN a.temps_travail = 'part_time' THEN 'Temps partiel'
-            ELSE NULL
-        END AS temps_travail,
-        CAST(NULL AS INT64) AS nombre_postes,
-        CAST(NULL AS BOOLEAN) AS is_alternance,
-        CAST(NULL AS STRING) AS qualification_code,
-        CAST(NULL AS STRING) AS qualification_libelle,
+        -- Contrat (déjà mappé au staging — D90)
+        a.type_contrat,
+        cast(null as string)                        as experience_exige,
+        cast(null as float64)                       as experience_duree_annees,
+        a.temps_travail,
+        cast(null as int64)                         as nombre_postes,
+        cast(null as boolean)                       as is_alternance,
+        cast(null as string)                        as qualification_code,
+        cast(null as string)                        as qualification_libelle,
 
-        -- Salaire harmonisé
-        a.salaire_annuel_min AS salaire_annuel_min,
-        a.salaire_annuel_max AS salaire_annuel_max,
-        CASE
-            WHEN a.salaire_annuel_min IS NULL AND a.salaire_annuel_max IS NULL THEN NULL
-            WHEN (a.salaire_annuel_min IS NOT NULL AND a.salaire_annuel_min < 15000)
-              OR (a.salaire_annuel_max IS NOT NULL AND a.salaire_annuel_max > 150000)
-            THEN TRUE
-            ELSE FALSE
-        END AS is_salaire_aberrant,
+        -- Salaire (inféré annuel au staging — D77 ; flag aligné — D91)
+        a.salaire_annuel_min,
+        a.salaire_annuel_max,
+        a.is_salaire_aberrant,
+        cast(null as boolean)                       as is_salaire_requalifie,
+        a.is_salaire_periodicite_inferree,
         a.source_salaire,
 
         -- Géographie issue de l'offre
-        CAST(NULL AS STRING) AS code_commune,
-        dept_lookup.code AS code_departement,
-        a.localisation_libelle AS libelle_lieu,
+        cast(null as string)                        as code_commune,
+        dept_lookup.code                            as code_departement,
+        a.localisation_libelle                      as libelle_lieu,
         a.latitude,
         a.longitude,
 
         -- Entreprise / secteur
         a.entreprise_nom,
-        CAST(NULL AS STRING) AS code_naf,
-        CAST(NULL AS STRING) AS secteur_activite_libelle,
-        CAST(NULL AS STRING) AS tranche_effectif,
-        CAST(NULL AS BOOLEAN) AS is_intermediaire,
+        cast(null as string)                        as code_naf,
+        cast(null as string)                        as secteur_activite_libelle,
+        cast(null as string)                        as tranche_effectif,
+        cast(null as boolean)                       as is_intermediaire,
 
         -- ROME
-        CAST(NULL AS STRING) AS rome_code,
-        CAST(NULL AS STRING) AS rome_libelle
+        cast(null as string)                        as rome_code,
+        cast(null as string)                        as rome_libelle
 
-    FROM {{ ref('stg_adzuna__offres') }} AS a
-    LEFT JOIN departements_lookup AS dept_lookup
-        ON TRIM(LOWER(a.departement_nom)) = TRIM(LOWER(dept_lookup.nom))
-
-),
-
-offres_unifiees AS (
-
-    SELECT * FROM france_travail
-    UNION ALL
-    SELECT * FROM adzuna
+    from {{ ref('stg_adzuna__offres') }} as a
+    left join {{ ref('stg_geo__departements') }} as dept_lookup
+        on a.departement_nom = dept_lookup.nom
 
 ),
 
-communes AS (
+unioned as (
 
-    SELECT
-        code,
-        nom,
-        nom_departement,
-        nom_region,
-        population
-    FROM {{ ref('stg_geo__communes') }}
+    -- ========================================================
+    -- UNION ALL trivial — pas de déduplication inter-sources (D46).
+    -- BigQuery valide au compile-time l'alignement strict des
+    -- colonnes (nombre, ordre, types compatibles).
+    -- ========================================================
+    select * from ft
+    union all
+    select * from adzuna
 
 ),
 
-departements_fallback AS (
+enriched as (
 
-    SELECT
-        code,
-        nom,
-        nom_region
-    FROM {{ ref('stg_geo__departements') }}
+    -- ========================================================
+    -- Enrichissement géographique post-UNION
+    --
+    -- Chemin principal : LEFT JOIN stg_geo__communes via
+    --   code_commune. Apporte nom_commune, nom_departement,
+    --   nom_region, population (~92.7% FT, 0% Adzuna).
+    --
+    -- Chemin fallback : LEFT JOIN stg_geo__departements via
+    --   code_departement. Apporte nom_departement et nom_region
+    --   uniquement (granularité département). Cible Adzuna et
+    --   les ~7.3% d'offres FT sans code_commune.
+    --
+    -- COALESCE priorise le chemin principal (richesse maximale).
+    -- ========================================================
+    select
+        o.*,
+        c.nom                                       as nom_commune,
+        coalesce(c.nom_departement, d.nom)          as nom_departement,
+        coalesce(c.nom_region, d.nom_region)        as nom_region,
+        c.population                                as population
+    from unioned as o
+    left join {{ ref('stg_geo__communes') }}     as c
+        on o.code_commune = c.code
+    left join {{ ref('stg_geo__departements') }} as d
+        on o.code_departement = d.code
 
 )
 
-SELECT
-    o.*,
-    c.nom AS nom_commune,
-    COALESCE(c.nom_departement, d.nom) AS nom_departement,
-    COALESCE(c.nom_region, d.nom_region) AS nom_region,
-    c.population
-FROM offres_unifiees AS o
-LEFT JOIN communes AS c
-    ON o.code_commune = c.code
-LEFT JOIN departements_fallback AS d
-    ON o.code_departement = d.code
+select * from enriched
