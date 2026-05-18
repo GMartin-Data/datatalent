@@ -75,13 +75,15 @@ models:
 
       - name: type_contrat
         description: >
-          Code contrat. FT : codes natifs (8 codes D88). Adzuna : mappé
-          permanent→CDI, contract→CDD au staging (D90). NULL pour Adzuna
-          quand valeur source absente ou hors mapping (70.6% Adzuna).
+          Code contrat. FT : codes natifs au format 3 lettres majuscules
+          (8 codes historiquement observés D88, élargissements récurrents
+          D92). Adzuna : mappé permanent→CDI, contract→CDD au staging
+          (D90). NULL pour Adzuna quand valeur source absente ou hors
+          mapping (70.6% Adzuna).
         data_tests:
-          - accepted_values:
+          - dbt_utils.expression_is_true:
               arguments:
-                values: ["CDI", "CDD", "MIS", "LIB", "CCE", "SAI", "DDI", "FRA"]
+                expression: "REGEXP_CONTAINS(type_contrat, r'^[A-Z]{3}$')"
               config:
                 where: "type_contrat IS NOT NULL"
 
