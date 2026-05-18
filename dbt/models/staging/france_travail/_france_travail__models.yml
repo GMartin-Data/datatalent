@@ -86,11 +86,9 @@ models:
           FRA. Élargissements récurrents constatés (D92) — le test contrôle
           désormais le format de nomenclature, pas l'énumération exhaustive.
         data_tests:
-          - dbt_utils.expression_is_true:
+          - matches_regex:
               arguments:
-                expression: "REGEXP_CONTAINS(type_contrat, r'^[A-Z]{3}$')"
-              config:
-                where: "type_contrat IS NOT NULL"
+                pattern: "^[A-Z]{3}$"
 
       - name: type_contrat_libelle
         description: Libellé du type de contrat (contient parfois la durée, 51+ valeurs distinctes).
