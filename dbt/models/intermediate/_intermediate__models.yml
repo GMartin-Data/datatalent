@@ -75,11 +75,13 @@ models:
 
       - name: type_contrat
         description: >
-          Code contrat. FT : codes natifs au format 3 lettres majuscules
-          (8 codes historiquement observés D88, élargissements récurrents
-          D92). Adzuna : mappé permanent→CDI, contract→CDD au staging
-          (D90). NULL pour Adzuna quand valeur source absente ou hors
-          mapping (70.6% Adzuna).
+          Code contrat. FT : codes natifs au format `^[A-Z]{3}$` contrôlé 
+          par test matches_regex (D92 supersedes D88). 9 codes historiquement 
+          observés au 2026-05-18 : CDI, CDD, MIS, LIB, CCE, SAI, DDI, FRA, 
+          DDT — liste indicative non exhaustive par construction du test. 
+          Adzuna : mappé permanent→CDI, contract→CDD au staging (D90). NULL 
+          pour Adzuna quand valeur source absente ou hors mapping (70.6% Adzuna).
+
         data_tests:
           - matches_regex:
               arguments:
