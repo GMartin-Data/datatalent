@@ -3,11 +3,14 @@ version: 2
 models:
   - name: stg_adzuna__offres
     description: >
-      Offres d'emploi issues d'Adzuna.
-      Modèle de staging mono-source dédupliqué par offre_id via _ingestion_date.
-      Aucune ligne n'est filtrée à ce stade : les colonnes de classification et de flag
-      permettent le tri en intermediate. Colonnes renommées à l'ingestion (D39).
-      Alimente int_offres_enrichies via UNION ALL avec stg_france_travail__offres.
+      Offres d'emploi issues d'Adzuna. Staging mono-source dédupliqué par
+      offre_id via _ingestion_date. Aucune ligne filtrée — les colonnes de 
+      classification et de flag permettent le tri en intermediate. Enrichi 
+      de colonnes calculées : périodicité salaire inférée + annualisation 
+      (D77), extraction géo (D84), classification métier via macro partagée 
+      (D85). Colonnes renommées à l'ingestion (D39), harmonisation Adzuna
+      ↔ FT au staging (D80, D86, D90, D91). Alimente int_offres_enrichies
+      via UNION ALL avec stg_france_travail__offres.
     columns:
       - name: offre_id
         description: Identifiant unique Adzuna, casté en STRING pour harmonisation aval.
@@ -24,12 +27,12 @@ models:
         description: Snippet tronqué de la description, pas le texte intégral.
 
       - name: date_creation
-        description: Date de création de l'offre côté source.
+        description: Date de création de l'offre côté source (TIMESTAMP UTC, format ISO-8601).
         data_tests:
           - not_null
 
       - name: source
-        description: Constante de traçabilité de la source.
+        description: Constante 'adzuna' — discriminant pour UNION ALL avec stg_france_travail__offres.
         data_tests:
           - not_null
           - accepted_values:
@@ -72,7 +75,10 @@ models:
                 expression: "= (categorie_metier = 'data_engineer')"
 
       - name: entreprise_nom
-        description: Nom commercial de l'entreprise (pas raison sociale).
+        description: >
+          Nom commercial de l'entreprise (pas raison sociale). Doublons 
+          potentiels non traités (ex : Onepoint / Onepoint Sas) — 
+          normalisation optionnelle non implémentée.
 
       - name: localisation_libelle
         description: Libellé textuel de localisation.
@@ -80,10 +86,13 @@ models:
           - not_null
 
       - name: region
-        description: Région extraite depuis localisation_area[1].
+        description: Région extraite depuis localisation_area[safe_offset(1)] (ARRAY<STRING> natif en raw, D84).
 
       - name: departement_nom
-        description: Département textuel extrait depuis localisation_area[2].
+        description: >
+          Nom du département (texte, pas code INSEE) extrait depuis 
+          localisation_area[safe_offset(2)] (D84). Résolution nom → code 
+          INSEE reportée en intermediate (jointure sur stg_geo__departements.nom).
 
       - name: latitude
         description: Latitude de l'offre.
@@ -125,7 +134,12 @@ models:
                 where: "salaire_periodicite IS NOT NULL"
 
       - name: is_salaire_periodicite_inferree
-        description: TRUE si une périodicité salaire a pu être inférée de façon prudente.
+        description: >
+          TRUE si une périodicité salaire a pu être inférée (salaire dans une tranche 
+          reconnue), FALSE sinon — confond "salaire absent" et "salaire hors 
+          tranches" par construction (D77). Pour distinguer la présence d'un 
+          salaire, utiliser source_salaire IS NOT NULL. Flag Adzuna-spécifique : 
+          NULL côté FT après UNION ALL (D86 A.4).
 
       - name: salaire_annuel_min
         description: >
@@ -140,6 +154,8 @@ models:
           Salaire maximum annualisé à partir de la périodicité inférée.
           Égal au salaire brut si la périodicité est inférée comme annuelle,
           ou salaire mensuel * 12 si elle est inférée comme mensuelle.
+          Si seul salaire_min est disponible, salaire_annuel_max reprend la 
+          valeur disponible pour conserver une symétrie min/max.
 
       - name: is_salaire_aberrant
         description: >

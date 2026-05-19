@@ -81,10 +81,13 @@ models:
       - name: type_contrat
         description: >
           Code contrat France Travail. Valeur source `typeContrat` propagée
-          tel quel. Format de nomenclature : 3 lettres majuscules. 8 codes
-          historiquement connus (D88) : CDI, CDD, MIS, LIB, CCE, SAI, DDI,
-          FRA. Élargissements récurrents constatés (D92) — le test contrôle
-          désormais le format de nomenclature, pas l'énumération exhaustive.
+          tel quel. Format de nomenclature `^[A-Z]{3}$` (3 lettres majuscules), 
+          contrôlé par test matches_regex (custom generic, severity error). 
+          9 codes historiquement observés au 2026-05-18 : CDI, CDD, MIS, LIB, 
+          CCE, SAI, DDI, FRA, DDT — liste indicative non exhaustive par 
+          construction du test (D92 supersedes D88 sur le mode de contrôle 
+          suite à apparition récurrente de nouveaux codes en raw).
+
         data_tests:
           - matches_regex:
               arguments:
@@ -125,6 +128,8 @@ models:
       - name: salaire_periodicite
         description: >
           Périodicité extraite de salaire.libelle par regex : 'annuel', 'mensuel', 'horaire', NULL.
+          Valeur d'origine, avant requalification (`is_salaire_requalifie` 
+          indique si elle a été transformée en annuel au calcul aval). 
           Naming aligné Adzuna ↔ FT (D86 A.3).
         data_tests:
           - accepted_values:
@@ -157,9 +162,10 @@ models:
 
       - name: source_salaire
         description: >
-          Indicateur de présence d'un salaire dans l'offre source. 'declare'
-          si salaire_annuel_min est non-NULL, NULL sinon. Émis au staging pour
-          symétrie complète avec stg_adzuna__offres (alignement D90).
+          Calculé au staging par alignement D90 avec Adzuna : 
+          `CASE WHEN salaire_annuel_min IS NOT NULL THEN 'declare' ELSE NULL END`. 
+          Sémantique : 'declare' si salaire renseigné par l'employeur, NULL sinon. 
+          Symétrie complète Adzuna ↔ FT — propagation pure en intermediate.
         data_tests:
           - accepted_values:
               arguments:
@@ -170,7 +176,9 @@ models:
       - name: is_salaire_aberrant
         description: >
           TRUE si salaire_annuel_min < 15k€, = 0, ou salaire_annuel_max > 250k€ (D42 +
-          borne haute D86 A.5 — validation empirique 2026-05-07 : 2 cas > 250k aberrants).
+          borne haute D86 A.5 — validation empirique 2026-05-07 : 2 cas > 250k 
+          aberrants). Symétrique avec Adzuna depuis D91 — mêmes seuils calculés 
+          au staging des deux côtés.
 
       - name: is_salaire_requalifie
         description: TRUE si salaire requalifié comme annuel (mensuel > 10k€ ou horaire > 100€, D41).

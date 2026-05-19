@@ -5,7 +5,7 @@ models:
     description: >
       Référentiel des régions françaises (API Géo, geo.api.gouv.fr).
       ~18 régions (métropole + DROM + COM). Données quasi-statiques,
-      dernier découpage régional = 2016.
+      dernier redécoupage régional = 2016.
       JSON brut en raw (D13), renommage camelCase → snake_case en staging.
     columns:
       - name: code
@@ -18,7 +18,7 @@ models:
         data_tests:
           - not_null
       - name: zone_geo
-        description: "Zone géographique : metro, drom, ou com"
+        description: "Zone géographique : metro, drom, ou com (renommé depuis `zone` pour désambiguïsation)"
         data_tests:
           - not_null
           - accepted_values:
@@ -53,7 +53,7 @@ models:
         data_tests:
           - not_null
       - name: zone_geo
-        description: "Zone géographique: metro, drom ou com"
+        description: "Zone géographique : metro, drom ou com (renommé depuis `zone` pour désambiguïsation)"
         data_tests:
           - not_null
           - accepted_values:
@@ -64,7 +64,7 @@ models:
       Référentiel des communes françaises (API Géo). ~35 000 communes.
       Clé de jointure principale avec les offres France Travail et Adzuna
       (code INSEE commune). Dénormalisé avec nom_departement et nom_region.
-      Coordonnées extraites du champ GeoJSON centre (ordre lon/lat).
+      Coordonnées extraites du champ GeoJSON centre (⚠ ordre lon/lat).
       JSON brut en raw (D13), renommage camelCase → snake_case en staging.
       Tests d'intégrité géo filtrés sur 8 codes COM sans parent (D76).
     columns:
