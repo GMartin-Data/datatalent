@@ -234,3 +234,163 @@ models:
 
       - name: rome_libelle
         description: Libellé ROME. FT only (100%). NULL pour Adzuna.
+
+  - name: int_offres_analytiques
+    description: |
+      Couche analytique partagée (D95) au grain offre. Héberge les
+      dérivées métier F1 (multi-vues salaire — D98), F2 (regroupement
+      codeNAF — D99), F5 (flags qualité — D101), F6 (dimensions
+      temporelles — D102). Consomme `int_offres_enrichies` (single
+      source) et alimente `fct_offres` (couche mart de présentation).
+
+      Idempotence garantie (D102 A.4) : aucune référence à CURRENT_DATE()
+      ou CURRENT_TIMESTAMP(). Asymétries FT/Adzuna acceptées (Adzuna
+      code_commune et code_naf NULL → score F5 plafonné à 3/5).
+    columns:
+      # --- Identité et propagation ---
+      - name: offre_id
+        description: Identifiant unique de l'offre (propagé staging)
+        data_tests:
+          - not_null
+
+      - name: source
+        description: Source de l'offre ('france_travail' ou 'adzuna')
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["france_travail", "adzuna"]
+
+      # --- F1 — Salaires multi-vues (D98) ---
+      - name: salaire_milieu
+        description: |
+          Salaire central de la fourchette (D98 A.2). Fallback unilatéral
+          si une seule borne renseignée. NULL si min et max NULL.
+
+      - name: salaire_milieu_pour_agregat
+        description: |
+          Salaire milieu exclu des estimés (D48) et aberrants (D91).
+          Pour KPI agrégats fiables.
+
+      - name: salaire_milieu_hors_interim
+        description: |
+          Salaire milieu exclu des estimés + aberrants + intermédiaires
+          (D14-bis). Pour KPI hors biais ESN.
+
+      - name: tranche_salaire
+        description: |
+          Bucket STRING sur salaire_milieu (7 valeurs + non_renseigne).
+          Seuils MVP : 35k/45k/60k/80k/100k.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - "non_renseigne"
+                  - "a_moins_35k"
+                  - "b_35_45k"
+                  - "c_45_60k"
+                  - "d_60_80k"
+                  - "e_80_100k"
+                  - "f_plus_100k"
+
+      - name: est_salaire_fiable
+        description: |
+          Flag composite qualité salariale maximale (D98 A.4) : déclaré
+          (ou NULL côté FT) + non-intérimaire + non-aberrant +
+          périodicité non-inférée + au moins une borne renseignée.
+        data_tests:
+          - not_null
+
+      # --- F2 — Regroupement codeNAF (D99) ---
+      - name: secteur_grande_categorie
+        description: |
+          9 buckets STRING regroupant le codeNAF (D99 A.2). Adzuna
+          systématiquement 'Non_renseigne' (code_naf NULL).
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - "Tech_IT_pur"
+                  - "Edition_logiciel"
+                  - "Conseil"
+                  - "ESN_Interim"
+                  - "Banque_Finance_Assurance"
+                  - "Public_Sante_Education"
+                  - "Industrie_Commerce"
+                  - "Autres"
+                  - "Non_renseigne"
+
+      - name: est_recruteur_intermediaire
+        description: |
+          Flag composite (D99 A.4) : OR entre is_intermediaire (déclaration
+          FT) et préfixe NACE 78 (structure juridique intérim).
+        data_tests:
+          - not_null
+
+      # --- F5 — Flags qualité (D101) ---
+      - name: qualite_donnee_score
+        description: |
+          Score additif 0-5 (D101 A.4). Adzuna plafonné 3/5 par
+          construction (code_commune + code_naf NULL).
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [0, 1, 2, 3, 4, 5]
+                quote: false
+
+      - name: est_analysable_geo_commune
+        description: code_commune renseigné. Adzuna systématiquement FALSE.
+        data_tests:
+          - not_null
+
+      - name: est_analysable_geo_dept
+        description: code_departement renseigné. FT et Adzuna ~100%.
+        data_tests:
+          - not_null
+
+      - name: est_analysable_salaire
+        description: Alias direct de est_salaire_fiable (D101 A.2).
+        data_tests:
+          - not_null
+
+      - name: est_analysable_secteur
+        description: |
+          secteur_grande_categorie != 'Non_renseigne'. Adzuna FALSE.
+        data_tests:
+          - not_null
+
+      # --- F6 — Dimensions temporelles (D102) ---
+      - name: date_creation_jour
+        description: DATE cast journalier de date_creation (D102 A.1).
+        data_tests:
+          - not_null
+
+      - name: mois_creation
+        description: |
+          DATE premier jour du mois de date_creation (D102 A.2).
+          Tri chronologique natif côté Looker.
+        data_tests:
+          - not_null
+
+      - name: trimestre_creation
+        description: INT64 1-4 (D102 A.1).
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [1, 2, 3, 4]
+                quote: false
+
+      - name: annee_creation
+        description: INT64 année calendaire (D102 A.1).
+        data_tests:
+          - not_null
+
+      - name: annee_trimestre_creation
+        description: |
+          STRING '2026-Q2' label trimestriel pour Looker (D102 A.3).
+        data_tests:
+          - not_null
