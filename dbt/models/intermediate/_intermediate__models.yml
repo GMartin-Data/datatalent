@@ -3,80 +3,162 @@ version: 2
 models:
   - name: int_offres_enrichies
     description: >
-      Table unifiée des offres d'emploi IT/Data. Combine France Travail et
-      Adzuna via UNION ALL, puis enrichit les offres avec les libellés
-      géographiques issus de l'API Géo. Le chemin principal utilise code_commune
-      via stg_geo__communes ; un fallback via code_departement permet de
-      renseigner nom_departement et nom_region quand code_commune est absent,
-      notamment pour Adzuna.
-
+      Table unifiée des offres d'emploi IT/Data. Combine France Travail
+      (~2 589 offres, 4 codes ROME) et Adzuna (~2 171 offres "data engineer")
+      via UNION ALL. Toutes les harmonisations inter-sources (structure D80,
+      libellés D86, valeurs D90, flag is_salaire_aberrant D91) sont opérées
+      au staging — l'intermediate est minimaliste : UNION ALL + résolution
+      code_departement Adzuna + enrichissement géo (stg_geo__communes) avec
+      fallback code_departement (stg_geo__departements). Pas de jointure
+      stg_geo__regions (nom_region déjà dénormalisé). PLM transparent (D87,
+      remap fait au staging FT). Matérialisée en table (D52). Pas de
+      déduplication inter-sources (D46).
     columns:
       - name: offre_id
-        description: Identifiant technique de l'offre dans sa source d'origine.
-        tests:
+        description: Identifiant unique de l'offre (format FT ou Adzuna).
+        data_tests:
+          - unique
           - not_null
 
       - name: titre
-        description: Titre de l'offre.
-        tests:
+        description: Intitulé de l'offre, propagé depuis le staging.
+        data_tests:
           - not_null
 
+      - name: description
+        description: Description de l'offre. FT = texte complet, Adzuna = snippet tronqué.
+
       - name: date_creation
-        description: Date de création/publication de l'offre.
-        tests:
+        description: Date de publication originale (TIMESTAMP).
+        data_tests:
           - not_null
 
       - name: source
-        description: Source de l'offre.
-        tests:
+        description: "Discriminant source : 'france_travail' ou 'adzuna' (D46)."
+        data_tests:
           - not_null
           - accepted_values:
               arguments:
-                values: [ "france_travail", "adzuna" ]
+                values: ["france_travail", "adzuna"]
 
       - name: categorie_metier
-        description: Catégorie métier harmonisée issue du staging.
-        tests:
+        description: >
+          Classification métier issue de la macro partagée
+          classify_categorie_metier (D85). 7 valeurs possibles.
+        data_tests:
           - not_null
           - accepted_values:
               arguments:
                 values:
-                  - "data_engineer"
-                  - "data_analyst"
-                  - "data_architect"
-                  - "bi_decisionnel"
-                  - "ml_engineer"
-                  - "data_scientist"
-                  - "autre_it"
+                  - data_engineer
+                  - data_analyst
+                  - data_architect
+                  - bi_decisionnel
+                  - ml_engineer
+                  - data_scientist
+                  - autre_it
 
       - name: is_metier_data
-        description: Booléen indiquant si l'offre appartient au périmètre data.
-        tests:
+        description: >
+          Filet large permissif (D89) — TRUE si le titre contient 'data' OU
+          un terme métier (ml/scientist/engineer/analyst). Plus permissif que
+          categorie_metier != 'autre_it'.
+        data_tests:
+          - not_null
+
+      - name: is_data_engineer
+        description: >
+          Flag de confort sur la cible métier projet (D81) — TRUE si
+          categorie_metier = 'data_engineer'.
+        data_tests:
           - not_null
 
       - name: type_contrat
         description: >
-          Type de contrat harmonisé. FT conserve ses codes natifs ; Adzuna mappe
-          permanent -> CDI et contract -> CDD.
-        tests:
+          Code contrat. FT : codes natifs au format 3 lettres majuscules
+          (8 codes historiquement observés D88, élargissements récurrents
+          D92). Adzuna : mappé permanent→CDI, contract→CDD au staging
+          (D90). NULL pour Adzuna quand valeur source absente ou hors
+          mapping (70.6% Adzuna).
+        data_tests:
+          - matches_regex:
+              arguments:
+                pattern: "^[A-Z]{3}$"
+
+      - name: experience_exige
+        description: Niveau d'expérience exigé (D/E/S). FT only.
+
+      - name: experience_duree_annees
+        description: >
+          Durée d'expérience exigée en années (FLOAT64). FT only — calcul
+          regex + division /12.0 fait au staging. NULL côté Adzuna.
+
+      - name: temps_travail
+        description: >
+          Temps plein / Temps partiel. Adzuna mappé au staging (D90,
+          full_time→Temps plein, part_time→Temps partiel).
+        data_tests:
           - accepted_values:
               arguments:
-                values: [ "CDI", "CDD", "MIS", "LIB", "CCE", "SAI", "DDI", "FRA" ]
+                values: ["Temps plein", "Temps partiel"]
               config:
-                where: "type_contrat IS NOT NULL"
+                where: "temps_travail IS NOT NULL"
+
+      - name: nombre_postes
+        description: Nombre de postes ouverts. FT only.
+
+      - name: is_alternance
+        description: Flag alternance. FT only.
+
+      - name: qualification_code
+        description: Code qualification FT. FT only.
+
+      - name: qualification_libelle
+        description: Libellé qualification FT. FT only.
+
+      - name: salaire_annuel_min
+        description: >
+          Salaire minimum en euros/an. FT : normalisé depuis libellé (périodicité
+          + nb mois) au staging. Adzuna : inféré annuel au staging (D77).
+          ⚠ Non strictement comparables entre sources malgré l'harmonisation
+          d'unité — filtrer par source pour analyses salariales fines.
+
+      - name: salaire_annuel_max
+        description: Salaire maximum en euros/an. Mêmes caveats que salaire_annuel_min.
+
+      - name: is_salaire_aberrant
+        description: >
+          TRUE si salaire aberrant. Seuils harmonisés D86 A.5 / D91 :
+          salaire_annuel_min < 15000 OU = 0 OU salaire_annuel_max > 250000.
+          Calculé au staging des deux côtés.
+
+      - name: is_salaire_requalifie
+        description: >
+          FT only (D86 A.4) — TRUE si requalification d'unité au staging
+          (mensuel > 10k€ ou horaire > 100€/h traités comme annuel). NULL
+          côté Adzuna (pas de requalification d'unité).
+
+      - name: is_salaire_periodicite_inferree
+        description: >
+          Adzuna only (D86 A.4) — TRUE si la périodicité du salaire a été
+          inférée statistiquement au staging (D77). NULL côté FT
+          (périodicité explicite dans le libellé source).
 
       - name: source_salaire
-        description: Source déclarative du salaire quand elle existe.
-        tests:
+        description: "'declare' quand salaire présent, NULL sinon. Calculé au staging des deux côtés (alignement D90)."
+        data_tests:
           - accepted_values:
               arguments:
-                values: [ "declare" ]
+                values: ["declare"]
               config:
                 where: "source_salaire IS NOT NULL"
 
       - name: code_commune
-        description: Code INSEE commune. Présent surtout côté France Travail.
-        tests:
+        description: >
+          Code INSEE commune (post-PLM staging D87). FT : 92.7% non-null.
+          Adzuna : toujours NULL (pas de code INSEE dans l'API Adzuna).
+          Clé de jointure principale vers stg_geo__communes.
+        data_tests:
           - relationships:
               arguments:
                 to: ref('stg_geo__communes')
@@ -86,15 +168,70 @@ models:
 
       - name: code_departement
         description: >
-          Code département. Présent côté FT et résolu autant que possible côté
-          Adzuna à partir du nom du département.
-        tests:
+          Code département. FT : extrait du code_commune au staging (100%).
+          Adzuna : résolu via jointure departement_nom = stg_geo__departements.nom
+          (égalité stricte, ~85.6%). Clé de jointure fallback et lien vers
+          int_tensions_bassin_emploi.
+        data_tests:
           - relationships:
               arguments:
                 to: ref('stg_geo__departements')
                 field: code
               config:
                 where: "code_departement IS NOT NULL"
+
+      - name: libelle_lieu
+        description: Libellé textuel du lieu (FT.localisation_libelle ou Adzuna.localisation_libelle, renommé symétriquement).
+
+      - name: latitude
+        description: Latitude (FLOAT64). FT 89.3%, Adzuna 86.2%.
+
+      - name: longitude
+        description: Longitude (FLOAT64). FT 89.3%, Adzuna 86.2%.
+
+      - name: nom_commune
+        description: >
+          Nom de la commune via jointure stg_geo__communes. NULL si
+          code_commune absent (toutes les offres Adzuna et 7.3% des FT).
+
+      - name: nom_departement
+        description: >
+          Nom du département. COALESCE(communes.nom_departement, departements.nom).
+          Chemin principal via code_commune, fallback via code_departement.
+
+      - name: nom_region
+        description: >
+          Nom de la région. COALESCE(communes.nom_region, departements.nom_region).
+          Pas de jointure stg_geo__regions — nom_region déjà dénormalisé dans
+          les deux référentiels.
+
+      - name: population
+        description: >
+          Population municipale de la commune. NULL si code_commune absent.
+          Pas de fallback département (granularité incompatible).
+
+      - name: entreprise_nom
+        description: Nom de l'entreprise. FT 36.2%, Adzuna 98.9%.
+
+      - name: code_naf
+        description: Code NAF employeur. FT only (47.8%). Biaisé intérim 38.3% (Axe 2).
+
+      - name: secteur_activite_libelle
+        description: Libellé secteur activité. FT only (47.8%).
+
+      - name: tranche_effectif
+        description: Tranche d'effectif employeur. FT only (15.7%).
+
+      - name: is_intermediaire
+        description: >
+          TRUE si code_naf IN ('78.10Z', '78.20Z'). FT only. NULL si code_naf
+          absent ou source Adzuna. Indispensable pour les analyses salariales.
+
+      - name: rome_code
+        description: Code ROME. FT only (100%). NULL pour Adzuna.
+
+      - name: rome_libelle
+        description: Libellé ROME. FT only (100%). NULL pour Adzuna.
 
   - name: int_densite_sectorielle_commune
     description: >

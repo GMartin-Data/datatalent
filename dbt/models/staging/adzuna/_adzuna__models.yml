@@ -141,6 +141,14 @@ models:
           Égal au salaire brut si la périodicité est inférée comme annuelle,
           ou salaire mensuel * 12 si elle est inférée comme mensuelle.
 
+      - name: is_salaire_aberrant
+        description: >
+          Flag d'aberration salariale aligné sur le seuil FT D86 A.5 (D91).
+          TRUE si salaire_annuel_min < 15000 OU = 0 OU salaire_annuel_max > 250000.
+          NULL si les deux salaires annuels sont NULL (propagation booléenne
+          ternaire SQL). Calcul opéré au staging pour symétrie inter-sources
+          avec stg_france_travail__offres et propagation pure en intermediate.
+
       - name: type_contrat
         description: >
           Type de contrat harmonisé sur le vocabulaire FT (D90).
