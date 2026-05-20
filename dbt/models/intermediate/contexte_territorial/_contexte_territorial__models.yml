@@ -59,8 +59,7 @@ models:
             expression: "nb_bassins_taux_calculable <= nb_bassins_volume_observable"
     columns:
       - name: code_departement
-        description: Code département INSEE — clé de jointure vers
-          mart_contexte_territorial.
+        description: Code département INSEE — clé de jointure vers fct_offres.
         data_tests:
           - not_null
       - name: annee
