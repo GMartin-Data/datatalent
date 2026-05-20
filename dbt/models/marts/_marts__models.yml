@@ -1,0 +1,376 @@
+version: 2
+
+models:
+
+  - name: fct_offres
+    description: >
+      Mart unifié des offres d'emploi IT/Data au grain offre, enrichi du
+      contexte territorial (densité communale URSSAF, tension départementale
+      BMO, benchmark salarial national URSSAF) et de métriques analytiques
+      fenêtrées. Alimenté par int_offres_analytiques (couche analytique
+      partagée F1+F2+F5+F6) + LEFT JOIN snapshot densité (D97) + LEFT JOIN
+      snapshot tension (D97) + CROSS JOIN snapshot salaire (D97) + F3 fenêtres
+      analytiques (D100) + F8 audit (D103) + F9 partitioning (D104).
+      Métadonnées D75 (statut_donnee, is_fiable_*, pct_couverture_*)
+      précalculées pour Looker Studio.
+
+    data_tests:
+
+      # Filet de sécurité snapshot — cardinalité préservée 1:1 vs amont
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns:
+              - source
+              - offre_id
+
+      # D75 — Invariant logique : nb_bassins_taux_calculable <= nb_bassins_volume_observable
+      # par construction BMO (masquage hiérarchique du secret stat). Validé empiriquement
+      # spot check Conv 3bis (0 ligne en violation sur 10 269).
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "pct_couverture_volume >= pct_couverture_taux OR pct_couverture_volume IS NULL"
+
+      # D75 — Range valide des pourcentages de couverture
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "pct_couverture_volume BETWEEN 0 AND 100 OR pct_couverture_volume IS NULL"
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "pct_couverture_taux BETWEEN 0 AND 100 OR pct_couverture_taux IS NULL"
+
+      # D97 A.3 — Seuils de fraîcheur snapshot (recalibrage manuel à chaque
+      # nouveau millésime ingéré). Calibrés sur l'état actuel des sources :
+      # URSSAF effectifs 2006-2024, BMO 2025, URSSAF masse salariale 1998-2024.
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "annee_contexte_densite >= 2024 OR annee_contexte_densite IS NULL"
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "annee_contexte_tension >= 2025 OR annee_contexte_tension IS NULL"
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "annee_contexte_salaire >= 2024"
+
+    columns:
+
+      # --- Identité offre ---
+      - name: offre_id
+        description: Identifiant technique de l'offre dans sa source d'origine.
+        data_tests:
+          - not_null
+
+      - name: titre
+        description: Titre de l'offre.
+        data_tests:
+          - not_null
+
+      - name: date_creation
+        description: Date de création ou de publication de l'offre. Colonne de partitionnement (D104).
+        data_tests:
+          - not_null
+
+      - name: source
+        description: Source de l'offre. Clé de clustering (D104).
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - france_travail
+                  - adzuna
+
+      # --- Métier ---
+      - name: categorie_metier
+        description: Catégorie métier harmonisée. Clé de clustering (D104).
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - data_engineer
+                  - data_analyst
+                  - data_architect
+                  - bi_decisionnel
+                  - ml_engineer
+                  - data_scientist
+                  - autre_it
+
+      - name: is_metier_data
+        description: Booléen indiquant si l'offre appartient au périmètre data.
+        data_tests:
+          - not_null
+
+      # --- Salaires F1 (D98) ---
+      - name: salaire_milieu
+        description: >
+          Salaire annuel moyen brut (D98). Fallback unilatéral si une seule
+          borne renseignée. NULL si aberrant ou ni min ni max.
+
+      - name: salaire_milieu_pour_agregat
+        description: >
+          Salaire annuel moyen pour agrégats (D98). Exclut estimés (D48) et
+          aberrants (D91).
+
+      - name: salaire_milieu_hors_interim
+        description: >
+          Salaire annuel moyen hors intermédiaires (D98). Exclut aussi les
+          offres flag is_intermediaire (D14-bis).
+
+      - name: tranche_salaire
+        description: Tranche de salaire annuelle (D98) — 7 buckets + non_renseigne.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - non_renseigne
+                  - a_moins_35k
+                  - b_35_45k
+                  - c_45_60k
+                  - d_60_80k
+                  - e_80_100k
+                  - f_plus_100k
+
+      - name: est_salaire_fiable
+        description: >
+          Flag qualité salaire maximale (D98 A.4 révisée) : source declare/null,
+          non-intermédiaire, non-aberrant, au moins une borne renseignée.
+        data_tests:
+          - not_null
+
+      # --- Secteur F2 (D99) ---
+      - name: secteur_grande_categorie
+        description: Regroupement codeNAF en 9 grandes catégories (D99).
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - Tech_IT_pur
+                  - Edition_logiciel
+                  - Conseil
+                  - ESN_Interim
+                  - Banque_Finance_Assurance
+                  - Public_Sante_Education
+                  - Industrie_Commerce
+                  - Autres
+                  - Non_renseigne
+
+      - name: est_recruteur_intermediaire
+        description: >
+          Flag intermédiaire/ESN/intérim (D99). Indispensable côté Looker pour
+          KPI "vrais employeurs" — top recruteurs dominé par plateformes
+          (validé empiriquement Conv 3bis spot check 06).
+        data_tests:
+          - not_null
+
+      # --- Qualité F5 (D101) ---
+      - name: qualite_donnee_score
+        description: >
+          Score d'analysabilité 0-5 (D101). Adzuna plafonné à 3/5 par
+          construction (code_commune et secteur Non_renseigne systématiques).
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [0, 1, 2, 3, 4, 5]
+                quote: false
+
+      - name: est_analysable_geo_commune
+        description: Flag code_commune renseigné (D101). Adzuna systématiquement FALSE.
+        data_tests:
+          - not_null
+
+      - name: est_analysable_geo_dept
+        description: Flag code_departement renseigné (D101).
+        data_tests:
+          - not_null
+
+      - name: est_analysable_salaire
+        description: Flag salaire exploitable (D101) — alias direct de est_salaire_fiable.
+        data_tests:
+          - not_null
+
+      - name: est_analysable_secteur
+        description: Flag secteur F2 hors Non_renseigne (D101). Adzuna systématiquement FALSE.
+        data_tests:
+          - not_null
+
+      # --- Dimensions temporelles F6 (D102) ---
+      - name: date_creation_jour
+        description: Date de création au format jour (D102).
+        data_tests:
+          - not_null
+
+      - name: mois_creation
+        description: Mois de création — premier jour du mois (D102).
+        data_tests:
+          - not_null
+
+      - name: trimestre_creation
+        description: Trimestre de création 1-4 (D102).
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [1, 2, 3, 4]
+                quote: false
+
+      - name: annee_creation
+        description: Année de création (D102).
+        data_tests:
+          - not_null
+
+      - name: annee_trimestre_creation
+        description: Libellé trimestriel '%Y-Q%Q' pour Looker (D102).
+        data_tests:
+          - not_null
+
+      # --- Année offre (dérivée mart) ---
+      - name: annee_offre
+        description: EXTRACT(YEAR FROM date_creation). Dimension de filtrage temporel Looker.
+        data_tests:
+          - not_null
+
+      # --- Densité communale snapshot (D97) ---
+      - name: annee_contexte_densite
+        description: >
+          Année du snapshot URSSAF effectifs (MAX disponible, attendu 2024).
+          NULL si offre non joinable (Adzuna sans code_commune ou commune
+          sans IT URSSAF déclaratif — ~13.92% côté FT).
+
+      - name: nb_etablissements_it
+        description: >
+          Établissements IT (4 codes APE 62) dans la commune de l'offre.
+          NULL Adzuna par construction.
+
+      - name: effectifs_salaries_it
+        description: >
+          Salariés IT dans la commune de l'offre. NULL Adzuna par construction.
+
+      # --- Tension départementale snapshot (D97) ---
+      - name: annee_contexte_tension
+        description: >
+          Année du snapshot BMO (MAX disponible, attendu 2025).
+          NULL pour ~5.3% des offres (département non couvert BMO IT).
+
+      - name: projets_recrutement_it
+        description: >
+          Plancher des projets de recrutement IT du département (NULLs
+          secret statistique ignorés). Sous-estimation systématique des
+          départements ruraux acceptée (D75).
+
+      - name: projets_difficiles_it
+        description: >
+          Plancher des projets jugés difficiles. Couverture < volume par
+          construction BMO (D75).
+
+      - name: part_difficile_pct_par_bassin
+        description: >
+          Taux de difficulté méthode A — moyenne territoriale (chaque bassin
+          pèse 1) (D75).
+
+      - name: part_difficile_pct_par_projet
+        description: >
+          Taux de difficulté méthode B-filtrée — vue volumique (chaque projet
+          pèse 1). Mesure principale dashboard (D75).
+
+      - name: nb_bassins_total
+        description: Lignes bassin × métier du département (D75).
+
+      - name: nb_bassins_volume_observable
+        description: Bassins avec projets_recrutement renseigné (D75).
+
+      - name: nb_bassins_taux_calculable
+        description: >
+          Bassins avec projets_difficiles renseigné (D75). Par construction
+          <= nb_bassins_volume_observable.
+
+      # --- Métadonnées fiabilité D75 (précalculées au mart) ---
+      - name: pct_couverture_volume
+        description: Pourcentage de couverture du volume (D75) — borne 0-100.
+
+      - name: pct_couverture_taux
+        description: >
+          Pourcentage de couverture du taux (D75) — borne 0-100,
+          <= pct_couverture_volume.
+
+      - name: is_fiable_volume
+        description: >
+          Flag fiabilité volume seuil 50% (D75). Logique ternaire BOOL —
+          TRUE/FALSE/NULL. Filtre Looker = TRUE exclut silencieusement FALSE
+          ET NULL (caveat documenté en cadrage).
+
+      - name: is_fiable_taux
+        description: >
+          Flag fiabilité taux seuil 50% (D75). Logique ternaire BOOL —
+          mêmes caveats que is_fiable_volume.
+
+      - name: statut_donnee
+        description: >
+          Statut pour choroplèthes Looker (D75) — 'observée', 'masquée',
+          'zéro réel'. 'masquée' agrège deux cas distincts validés
+          empiriquement Conv 3bis (544 offres non joinables + 62 offres
+          dans départements tous bassins masqués).
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - observée
+                  - masquée
+                  - zéro réel
+
+      # --- Benchmark salarial national snapshot (D97) ---
+      - name: annee_contexte_salaire
+        description: >
+          Année du snapshot URSSAF masse salariale (MAX disponible, attendu
+          2024). Uniforme sur toutes les lignes (CROSS JOIN).
+        data_tests:
+          - not_null
+
+      - name: salaire_brut_moyen_sectoriel
+        description: >
+          Salaire brut moyen annuel sectoriel IT national (NA88 = 62), en €.
+          Calculé masse_salariale_brute / effectifs_salaries_moyens. Uniforme
+          sur toutes les lignes.
+        data_tests:
+          - not_null
+
+      # --- Métriques fenêtrées F3 (D100) ---
+      - name: nb_offres_commune
+        description: >
+          Volume d'offres dans la commune (D100 A.1). NULL si code_commune
+          NULL (Adzuna 100% NULL par construction).
+
+      - name: nb_offres_categorie_dept
+        description: >
+          Volume d'offres par métier × département (D100 A.2). NULL si
+          categorie_metier ou code_departement NULL.
+
+      - name: nb_offres_meme_entreprise_60j
+        description: >
+          Volume d'offres de la même entreprise sur fenêtre 60 jours glissants
+          (D100 A.3). Biais structurel : couverture entreprise_nom 99% Adzuna /
+          31% FT (validé empiriquement Conv 3bis spot check 06).
+
+      - name: densite_offres_par_100k_hab
+        description: >
+          Densité offres pour 100k habitants (D100 A.4) — normalisation par
+          taille commune. NULL si population NULL ou commune non joinable.
+
+      - name: rang_volume_commune
+        description: >
+          Rang global de la commune par volume d'offres (D100 A.5). Paris #1
+          validé empiriquement Conv 3bis spot check 07.
+
+      # --- Audit dbt F8 (D103) ---
+      - name: dbt_loaded_at
+        description: Timestamp BigQuery du run (D103).
+        data_tests:
+          - not_null
+
+      - name: dbt_invocation_id
+        description: Identifiant canonique du run dbt (D103).
+        data_tests:
+          - not_null
