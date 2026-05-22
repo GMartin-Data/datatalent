@@ -32,3 +32,6 @@ ingestion/sirene/data/
 
 # Ingestion
 ingestion/logs/
+
+# AI-driven dev (personal, not shared with the team)
+CLAUDE.md
