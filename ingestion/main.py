@@ -29,6 +29,11 @@ SOURCES: list[tuple[str, Callable]] = [
     ("geo", run_geo),
 ]
 
+# Sources without which downstream dbt marts would be empty or stale (D108).
+# A failure on any of these blocks the dbt invocation in main(); failures on
+# other sources only degrade enrichment and are tolerated best-effort.
+CRITICAL_SOURCES: frozenset[str] = frozenset({"france_travail", "adzuna"})
+
 
 def main() -> None:
     """Run all ingestion sources sequentially (best-effort).
