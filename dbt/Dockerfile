@@ -22,3 +22,6 @@ COPY macros macros/
 COPY tests tests/
 
 ENTRYPOINT ["uv", "run", "dbt"]
+# Default subcommand, overridable via Cloud Run `args` or `gcloud run jobs execute --args`.
+# Without CMD, the container would run `uv run dbt` with no subcommand → prints help → silent no-op.
+CMD ["build"]
