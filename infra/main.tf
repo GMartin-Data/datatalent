@@ -19,7 +19,7 @@ module "bigquery" {
 
   project_id  = var.project_id
   region      = var.region
-  dataset_ids = ["raw", "staging", "intermediate", "marts"]
+  dataset_ids = ["raw", "staging", "intermediate", "marts", "marts_archive"]
 }
 
 # --- IAM ---
