@@ -93,6 +93,7 @@ resource "google_project_service" "apis" {
     "cloudresourcemanager.googleapis.com",
     "billingbudgets.googleapis.com",
     "iam.googleapis.com",
+    "monitoring.googleapis.com",
   ])
 
   project = var.project_id
@@ -213,6 +214,21 @@ resource "google_cloud_run_v2_job_iam_member" "sa_ingestion_invokes_dbt" {
   name     = module.cloud_run_dbt.job_name
   role     = "roles/run.invoker"
   member   = "serviceAccount:${module.iam.service_account_email}"
+}
+
+# --- Monitoring (D105, D106) ---
+# Notification channel + 3 alert policies natives Cloud Run / Scheduler.
+# Niveaux 2 (log-based metrics) et 3 (data quality dbt) reportés post-soutenance.
+
+module "monitoring" {
+  source = "./modules/monitoring"
+
+  project_id         = var.project_id
+  notification_email = "datatalent-alerts@googlegroups.com"
+  ingestion_job_name = module.cloud_run.job_name
+  dbt_job_name       = module.cloud_run_dbt.job_name
+
+  depends_on = [google_project_service.apis]
 }
 
 resource "google_bigquery_dataset" "billing_export" {
