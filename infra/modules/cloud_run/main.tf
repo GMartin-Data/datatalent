@@ -23,11 +23,17 @@ resource "google_cloud_run_v2_job" "this" {
           }
         }
 
-        # Env vars statiques (si besoin futur)
-        # env {
-        #   name  = "LOG_LEVEL"
-        #   value = "INFO"
-        # }
+        # Env vars statiques (valeurs littérales fournies par l'instanciation).
+        # Cas d'usage: configuration runtime non-sensible lue via os.environ
+        # par le code applicatif (cf. _invoke_dbt() qui construit le nom de
+        # ressource Cloud Run cible à partir de GCP_PROJECT_ID/GCP_REGION, D113).
+        dynamic "env" {
+          for_each = var.static_env_vars
+          content {
+            name  = env.key
+            value = env.value
+          }
+        }
 
         # Env vars depuis Secret Manager
         # Chaque entrée de la map crée un bloc env avec une référence

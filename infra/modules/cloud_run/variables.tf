@@ -63,6 +63,12 @@ variable "secret_env_vars" {
   type        = map(string)
 }
 
+variable "static_env_vars" {
+  description = "Map of static environment variable name to literal value, injected into the container. Use for non-sensitive runtime configuration the container code reads via os.environ (e.g. GCP_PROJECT_ID, GCP_REGION). Sensitive values must go through secret_env_vars instead."
+  type        = map(string)
+  default     = {}
+}
+
 variable "create_scheduler" {
   description = "Whether to create a Cloud Scheduler that triggers the job. Set to false when invocation is handled elsewhere (e.g. from another Cloud Run Job)."
   type        = bool

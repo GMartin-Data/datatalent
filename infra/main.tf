@@ -161,6 +161,13 @@ module "cloud_run" {
   service_account_email = module.iam.service_account_email
   schedule              = "0 6 * * 1"
 
+  # main.py invoque le Job dbt en fin d'ingestion (D72, D108). _invoke_dbt()
+  # construit le nom complet de la ressource cible via os.environ (D113).
+  static_env_vars = {
+    GCP_PROJECT_ID = var.project_id
+    GCP_REGION     = var.region
+  }
+
   secret_env_vars = {
     FT_CLIENT_ID     = module.secret_manager.secret_ids["ft-client-id"]
     FT_CLIENT_SECRET = module.secret_manager.secret_ids["ft-client-secret"]
