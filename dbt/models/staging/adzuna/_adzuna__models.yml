@@ -11,6 +11,11 @@ models:
       (D85). Colonnes renommées à l'ingestion (D39), harmonisation Adzuna
       ↔ FT au staging (D80, D86, D90, D91). Alimente int_offres_enrichies
       via UNION ALL avec stg_france_travail__offres.
+    config:
+      meta:
+        owner: Quentin
+        update_frequency: hebdomadaire
+      tags: ['staging', 'adzuna']
     columns:
       - name: offre_id
         description: Identifiant unique Adzuna, casté en STRING pour harmonisation aval.
@@ -76,9 +81,11 @@ models:
 
       - name: entreprise_nom
         description: >
-          Nom commercial de l'entreprise (pas raison sociale). Doublons 
-          potentiels non traités (ex : Onepoint / Onepoint Sas) — 
+          Nom commercial de l'entreprise (pas raison sociale). Doublons
+          potentiels non traités (ex : Onepoint / Onepoint Sas) —
           normalisation optionnelle non implémentée.
+        config:
+          tags: ['pii']
 
       - name: localisation_libelle
         description: Libellé textuel de localisation.

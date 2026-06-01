@@ -7,6 +7,11 @@ models:
       ~18 régions (métropole + DROM + COM). Données quasi-statiques,
       dernier redécoupage régional = 2016.
       JSON brut en raw (D13), renommage camelCase → snake_case en staging.
+    config:
+      meta:
+        owner: Abdel
+        update_frequency: hebdomadaire
+      tags: ['staging', 'geo']
     columns:
       - name: code
         description: "Code région (ex: 32 = Hauts-de-France)"
@@ -30,6 +35,11 @@ models:
       Référentiel des départements français (API Géo). ~ 101 départements.
       Dénormalisé avec nom_region via JOIN sur stg_geo__regions.
       JSON brut en raw (D13), renommage camelCase → snake_case en staging.
+    config:
+      meta:
+        owner: Abdel
+        update_frequency: hebdomadaire
+      tags: ['staging', 'geo']
     columns:
       - name: code
         description: "Code département (ex: 59 = Nord)"
@@ -67,6 +77,11 @@ models:
       Coordonnées extraites du champ GeoJSON centre (⚠ ordre lon/lat).
       JSON brut en raw (D13), renommage camelCase → snake_case en staging.
       Tests d'intégrité géo filtrés sur 8 codes COM sans parent (D76).
+    config:
+      meta:
+        owner: Abdel
+        update_frequency: hebdomadaire
+      tags: ['staging', 'geo']
     columns:
       - name: code
         description: "Code INSEE commune (ex: 59350 = Lille). Clé de jointure avec offres.code_commune."

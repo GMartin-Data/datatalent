@@ -9,6 +9,11 @@ models:
       projets_recrutement, projets_difficiles et projets_saisonniers
       correspondent au secret statistique (seuil de diffusion). Colonnes
       renommées à l'ingestion (D39).
+    config:
+      meta:
+        owner: Greg
+        update_frequency: hebdomadaire
+      tags: ['staging', 'bmo']
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:

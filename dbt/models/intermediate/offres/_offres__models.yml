@@ -13,6 +13,11 @@ models:
       stg_geo__regions (nom_region déjà dénormalisé). PLM transparent (D87,
       remap fait au staging FT). Matérialisée en table (D52). Pas de
       déduplication inter-sources (D46).
+    config:
+      meta:
+        owner: Quentin
+        update_frequency: hebdomadaire
+      tags: ['intermediate', 'offres']
     columns:
       - name: offre_id
         description: Identifiant unique de l'offre (format FT ou Adzuna).
@@ -214,6 +219,8 @@ models:
 
       - name: entreprise_nom
         description: Nom de l'entreprise. FT 36.2%, Adzuna 98.9%.
+        config:
+          tags: ['pii']
 
       - name: code_naf
         description: Code NAF employeur. FT only (47.8%). Biaisé intérim 38.3% (Axe 2).
@@ -246,6 +253,11 @@ models:
       Idempotence garantie (D102 A.4) : aucune référence à CURRENT_DATE()
       ou CURRENT_TIMESTAMP(). Asymétries FT/Adzuna acceptées (Adzuna
       code_commune et code_naf NULL → score F5 plafonné à 3/5).
+    config:
+      meta:
+        owner: Abdel
+        update_frequency: hebdomadaire
+      tags: ['intermediate', 'offres', 'analytique']
     columns:
       # --- Identité et propagation ---
       - name: offre_id

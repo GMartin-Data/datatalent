@@ -18,6 +18,12 @@ models:
       construction. Cohérent avec D74 (URSSAF).
       Alimente int_offres_enrichies via UNION ALL avec stg_adzuna__offres.
 
+    config:
+      meta:
+        owner: Abdel
+        update_frequency: hebdomadaire
+      tags: ['staging', 'france_travail']
+
     data_tests:
       - dbt_utils.expression_is_true:
           arguments:
@@ -225,6 +231,8 @@ models:
 
       - name: entreprise_nom
         description: "Nom de l'entreprise (depuis entreprise.nom). NULL si absent (~64%)."
+        config:
+          tags: ['pii']
 
       - name: is_intermediaire
         description: >

@@ -8,10 +8,20 @@ models:
       Livrable technique — aucune table intermediate ne consomme ce modèle (D14-bis, D50).
       Parquet brut chargé en raw (D11), renommage camelCase → snake_case en staging.
       StockUniteLegale (~29M lignes) reste en raw sans staging (jointure invalidée D14-bis, D50).
+    config:
+      meta:
+        owner: Quentin
+        update_frequency: hebdomadaire
+      tags: ['staging', 'sirene']
 
     columns:
+      # Identifiants et noms d'entreprise marqués 'pii' : un établissement peut
+      # être une entreprise individuelle (personne physique) — donnée personnelle
+      # au sens RGPD. Cf. is_diffusion_partielle ci-dessous.
       - name: siret
         description: Identifiant SIRET de l'établissement (14 chiffres). Clé naturelle.
+        config:
+          tags: ['pii']
         data_tests:
           - unique
           - not_null
@@ -20,6 +30,8 @@ models:
         description: >
           Identifiant SIREN de l'entreprise (9 premiers chiffres du SIRET).
           Lien vers StockUniteLegale en raw.
+        config:
+          tags: ['pii']
         data_tests:
           - not_null
 
@@ -27,11 +39,15 @@ models:
         description: >
           Nom d'usage de l'établissement (20.9% non-null).
           Distinct de la raison sociale (denominationUniteLegale, dans StockUniteLegale).
+        config:
+          tags: ['pii']
 
       - name: enseigne
         description: >
           Enseigne commerciale (19.5% non-null).
           Nom sous lequel l'activité est connue du public.
+        config:
+          tags: ['pii']
 
       - name: code_naf
         description: >
