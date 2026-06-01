@@ -140,84 +140,137 @@ flowchart LR
 
 Les composants transverses qui font tourner le pipeline. L'intégralité est
 provisionnée par Terraform, à l'exception du bucket de state (bootstrap problem).
+Quatre vues complémentaires : le flux d'exécution nominal, puis trois focus
+transverses (sécurité, monitoring, déploiement) qui partagent le même squelette.
+
+### 3.1 Flux d'exécution nominal
 
 ```mermaid
-graph TD
-    subgraph trigger["Déclenchement"]
-        CS["Cloud Scheduler<br/>cron 0 6 * * 1<br/>hebdomadaire"]
-    end
-
-    subgraph compute["Exécution"]
-        CR["Cloud Run Job ingestion<br/>Conteneur Docker<br/>python main.py"]
-        DBT["Cloud Run Job dbt<br/>CMD dbt build"]
-    end
-
-    subgraph storage["Stockage"]
-        GCS["GCS<br/>datatalent-glaq-2-raw/"]
-        BQ["BigQuery<br/>4 datasets Medallion<br/>+ marts_archive + billing_export"]
-    end
-
-    subgraph security["Sécurité"]
-        SM["Secret Manager<br/>client_id + client_secret FT<br/>app_id + app_key Adzuna"]
-        IAM["IAM<br/>sa-ingestion · sa-dbt<br/>ADC en dev local"]
-    end
-
-    subgraph monitoring["Monitoring"]
-        AP["2 alert policies<br/>ingestion_job_failed<br/>dbt_job_failed"]
-        NC["Notification channel email<br/>datatalent-alerts@googlegroups.com"]
-    end
-
-    subgraph iac["IaC"]
-        TF["Terraform<br/>modules : gcs · bigquery · cloud_run<br/>iam · secret_manager · monitoring"]
-        STATE["GCS backend<br/>datatalent-glaq-2-tfstate"]
-    end
-
-    subgraph cicd["CI/CD — GitHub Actions"]
-        CI["ci.yml — sur PR<br/>path-scoped + ci-success<br/>ruff · dbt compile/test · tf validate"]
-        CDI["cd-ingestion.yml — sur merge<br/>Docker build + push AR<br/>gcloud run jobs update"]
-        CDD["cd-dbt.yml — sur merge<br/>build + push image dbt"]
-    end
+flowchart LR
+    CS(["Cloud Scheduler<br/>lundi 6 h"])
+    CR["Job ingestion<br/>main.py · 7 sources"]
+    GCS["GCS<br/>landing zone"]
+    RAW["BigQuery<br/>raw"]
+    DBT["Job dbt<br/>dbt build"]
+    MARTS["BigQuery<br/>marts · fct_offres"]
+    DASH(["Looker Studio<br/>dashboard"])
 
     CS -->|"HTTP trigger"| CR
-    CR -->|"upload bruts"| GCS
-    GCS -->|"load"| BQ
-    CR -->|"run_job() cross-Job<br/>si sources critiques OK"| DBT
-    DBT -->|"dbt build"| BQ
+    CR -->|"upload"| GCS
+    GCS -->|"load"| RAW
+    CR -->|"invoque (si critiques OK)"| DBT
+    RAW --> DBT
+    DBT -->|"build"| MARTS
+    MARTS --> DASH
 
-    SM -.->|"credentials FT + Adzuna"| CR
-    IAM -.->|"permissions"| CR
-    IAM -.->|"permissions"| BQ
-    IAM -.->|"GCP_PROJECT_ID/REGION<br/>injectées"| CR
+    linkStyle default stroke:#888,stroke-width:1.5px
+    classDef trig fill:#f2dbd8,stroke:#b55a50,stroke-width:1.5px,color:#2e3440
+    classDef proc fill:#dfe6f0,stroke:#5e81ac,stroke-width:1.5px,color:#2e3440
+    classDef store fill:#f5edda,stroke:#c9a95a,stroke-width:1.5px,color:#2e3440
+    classDef out fill:#d8ebdd,stroke:#6b9e78,stroke-width:1.5px,color:#2e3440
 
-    AP --> NC
-    CR -.->|"failed execution"| AP
-    DBT -.->|"failed execution"| AP
+    class CS trig
+    class CR,DBT proc
+    class GCS,RAW,MARTS store
+    class DASH out
+```
 
-    TF -.->|"provisionne tout"| storage
-    TF -.->|"provisionne tout"| compute
-    TF -.->|"provisionne tout"| security
-    TF -.->|"provisionne tout"| monitoring
-    TF --- STATE
+### 3.2 Focus — Sécurité et habilitation
 
-    CDI -->|"déploie image"| CR
-    CDD -->|"déploie image"| DBT
-    CI -->|"valide sur PR"| DBT
+```mermaid
+flowchart LR
+    CR["Job ingestion"]
+    DBT["Job dbt"]
+    BQ["BigQuery"]
 
-    classDef trigger fill:#f2dbd8,stroke:#b55a50,stroke-width:1.5px,color:#2e3440
-    classDef compute fill:#dfe6f0,stroke:#5e81ac,stroke-width:1.5px,color:#2e3440
-    classDef storage fill:#f5edda,stroke:#c9a95a,stroke-width:1.5px,color:#2e3440
-    classDef security fill:#e8e8e8,stroke:#888888,stroke-width:1px,color:#2e3440
-    classDef monitoring fill:#f2dbd8,stroke:#b55a50,stroke-width:1.5px,color:#2e3440
+    SAI(["sa-ingestion<br/>identité du Job ingestion"])
+    SAD(["sa-dbt<br/>identité du Job dbt"])
+    SM["Secret Manager<br/>FT : client_id/secret<br/>Adzuna : app_id/key"]
+
+    SAI -->|"run.invoker → dbt<br/>+ accès GCS/BQ"| CR
+    SAD -->|"BQ dataEditor/jobUser"| DBT
+    SM -->|"credentials montés"| CR
+    CR -->|"écrit raw"| BQ
+    DBT -->|"écrit staging→marts"| BQ
+
+    linkStyle default stroke:#888,stroke-width:1.5px
+    classDef proc fill:#dfe6f0,stroke:#5e81ac,stroke-width:1.5px,color:#2e3440
+    classDef sec fill:#e8e8e8,stroke:#888,stroke-width:1.5px,color:#2e3440
+    classDef store fill:#f5edda,stroke:#c9a95a,stroke-width:1.5px,color:#2e3440
+
+    class CR,DBT proc
+    class SAI,SAD,SM sec
+    class BQ store
+```
+
+Chaque Job a sa propre identité (`sa-ingestion`, `sa-dbt`) — séparation des
+privilèges runtime (D60). Seuls France Travail et Adzuna ont des credentials,
+isolés dans Secret Manager ; les autres sources sont des API ouvertes. ADC en
+dev local (D27).
+
+### 3.3 Focus — Monitoring et robustesse
+
+```mermaid
+flowchart LR
+    CR["Job ingestion"]
+    DBT["Job dbt"]
+    CS(["Cloud Scheduler"])
+
+    AP1{{"alert policy<br/>ingestion_job_failed"}}
+    AP2{{"alert policy<br/>dbt_job_failed"}}
+    MAIL(["email<br/>datatalent-alerts@…"])
+
+    CR -.->|"failed execution"| AP1
+    DBT -.->|"failed execution"| AP2
+    AP1 --> MAIL
+    AP2 --> MAIL
+
+    GAP["Trou assumé : échec scheduler non couvert<br/>(métrique native inexistante · D109) → reporté Niveau 2"]
+    CS -.->|"non couvert"| GAP
+
+    linkStyle default stroke:#888,stroke-width:1.5px
+    classDef proc fill:#dfe6f0,stroke:#5e81ac,stroke-width:1.5px,color:#2e3440
+    classDef trig fill:#f2dbd8,stroke:#b55a50,stroke-width:1.5px,color:#2e3440
+    classDef alert fill:#f5edda,stroke:#c9a95a,stroke-width:1.5px,color:#2e3440
+    classDef out fill:#d8ebdd,stroke:#6b9e78,stroke-width:1.5px,color:#2e3440
+    classDef gap fill:#f7d9d4,stroke:#b55a50,stroke-width:2px,color:#2e3440
+
+    class CR,DBT proc
+    class CS trig
+    class AP1,AP2 alert
+    class MAIL out
+    class GAP gap
+```
+
+Deux alert policies natives Cloud Run (`ingestion_job_failed`, `dbt_job_failed`)
+routées vers un notification channel email (D105/D106). L'échec du Scheduler n'a
+pas de métrique native (D109) — trou documenté, reporté en Niveau 2 log-based.
+
+### 3.4 Focus — Déploiement (IaC + CI/CD)
+
+```mermaid
+flowchart LR
+    MODS["Terraform · provisionne tout<br/>(sauf bucket state)<br/>6 modules : gcs · bigquery · cloud_run<br/>iam · secret_manager · monitoring"]
+
+    STATE[("GCS backend<br/>tfstate · bootstrap manuel")]
+    INFRA["Infra GCP<br/>(Jobs, datasets, IAM,<br/>secrets, alertes)"]
+
+    MODS --- STATE
+    MODS ==>|"terraform apply"| INFRA
+
+    CICD["CI/CD GitHub Actions<br/>CI valide sur PR (path-scoped + ci-success)<br/>CD déploie les images sur merge"]
+    CICD ==>|"push image :SHA<br/>gcloud run jobs update"| INFRA
+
+    linkStyle default stroke:#888,stroke-width:1.5px
     classDef iac fill:#eeedfe,stroke:#534ab7,stroke-width:1.5px,color:#2e3440
+    classDef state fill:#e8e8e8,stroke:#888,stroke-width:1.5px,color:#2e3440
+    classDef infra fill:#dfe6f0,stroke:#5e81ac,stroke-width:1.5px,color:#2e3440
     classDef cicd fill:#d6eae4,stroke:#5d9e8a,stroke-width:1.5px,color:#2e3440
 
-    class CS trigger
-    class CR,DBT compute
-    class GCS,BQ storage
-    class SM,IAM security
-    class AP,NC monitoring
-    class TF,STATE iac
-    class CI,CDI,CDD cicd
+    class MODS iac
+    class STATE state
+    class INFRA infra
+    class CICD cicd
 ```
 
 **Points clés :**
