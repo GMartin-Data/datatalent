@@ -9,6 +9,11 @@ models:
       codes APE IT filtrés à l'ingestion (D37). Format long après unpivot
       Python. Colonnes renommées à l'ingestion (D39). ⚠ Paris = arrondissements
       75101–75120, pas commune 75056.
+    config:
+      meta:
+        owner: Louis
+        update_frequency: hebdomadaire
+      tags: ['staging', 'urssaf']
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:
@@ -71,6 +76,11 @@ models:
       Table de référence sectorielle URSSAF — masse salariale brute et effectifs
       du secteur IT (NA88 = 62) par année (1998–2024). Source : open.urssaf.fr,
       dataset Opendatasoft. Colonnes renommées à l'ingestion (D39).
+    config:
+      meta:
+        owner: Abdel
+        update_frequency: hebdomadaire
+      tags: ['staging', 'urssaf']
     columns:
       - name: annee
         description: Année de référence (1998–2024)

@@ -8,6 +8,11 @@ models:
       communes de Paris, Lyon et Marseille sont normalisés (arrondissements →
       code central INSEE) pour garantir la jointure avec les offres France
       Travail dans les marts aval. Grain : une ligne par code_commune × annee.
+    config:
+      meta:
+        owner: Louis
+        update_frequency: hebdomadaire
+      tags: ['intermediate', 'contexte_territorial']
 
     columns:
       - name: code_commune
@@ -45,6 +50,11 @@ models:
       codes FAP IT). Le WHERE sur M1X%/M2X% est une redondance défensive.
       Méthode A = AVG des taux par bassin (vue territoriale). Méthode B-filtrée
       = SUM/SUM aligné sur les lignes complètes (vue volumique).
+    config:
+      meta:
+        owner: Greg
+        update_frequency: hebdomadaire
+      tags: ['intermediate', 'contexte_territorial']
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:
