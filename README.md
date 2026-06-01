@@ -168,4 +168,18 @@ charge par les workflows CD au merge sur `main`.
 | [docs/setup.md](docs/setup.md) | Onboarding développeur, installation, conventions |
 | [docs/architecture.md](docs/architecture.md) | Schémas détaillés (acquisition, dbt, infra) |
 | [docs/runbook.md](docs/runbook.md) | Exploitation, surveillance, diagnostic d'incident |
-| Catalogue de données | `dbt docs generate` / `dbt docs serve` (modèles, sources, lignage) |
+
+### Catalogue de données et lignage
+
+Le catalogue (descriptions des tables et colonnes, propriétaires, fréquences de
+mise à jour, tags `pii`) et le lignage interactif (DAG `staging → intermediate →
+marts`) sont produits par dbt. Une fois l'environnement dbt configuré
+(voir [docs/setup.md](docs/setup.md)) :
+
+```bash
+cd dbt
+uv run dbt docs generate   # construit le catalogue (manifest + catalog)
+uv run dbt docs serve       # ouvre le site sur http://localhost:8080
+```
+
+Le DAG de lignage est accessible via l'icône en bas à droite du site généré.
