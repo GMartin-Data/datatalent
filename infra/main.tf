@@ -111,9 +111,18 @@ resource "google_artifact_registry_repository" "docker" {
   format        = "DOCKER"
   description   = "Docker images for Datatalent pipelines"
 
-  # Purge automatique des anciennes images Docker pour rester
-  # sous le free tier Artifact Registry (500 MB). Seules les 3
-  # dernières versions de chaque image sont conservées. Voir D69.
+  # Purge automatique des anciennes images Docker pour rester sous le free tier
+  # Artifact Registry (0,5 Go). Seules les 3 dernières versions de chaque image
+  # sont conservées. Voir D115.
+  #
+  # dry_run = false : sans lui, la policy tourne en dry-run (elle logge ce qu'elle
+  # supprimerait sans rien supprimer) et l'accumulation continue (D115 : 49 versions /
+  # 8,9 Go observés). NB : sur un repo EXISTANT dont le state porte déjà `false`, cette
+  # ligne est un no-op au `plan` (HCL=state, jamais propagé à l'API) — le dry-run a été
+  # désarmé hors Terraform via `gcloud ... set-cleanup-policies --no-dry-run` (cf. D115).
+  # Cette ligne garantit le bon comportement à la (re)création du repo sur état neuf.
+  cleanup_policy_dry_run = false
+
   cleanup_policies {
     id     = "keep-recent"
     action = "KEEP"
