@@ -6,6 +6,8 @@ Procédures opérationnelles pour surveiller, diagnostiquer et vérifier le pipe
 
 **Prérequis CLI** : `gcloud` authentifié sur le projet `datatalent-glaq-2`, `bq` configuré, `jq` installé (`apt install jq` ou équivalent).
 
+> **Coup d'œil rapide vs diagnostic.** Pour un déclenchement ou une vérification express (démo, contrôle ponctuel), le `Makefile` racine expose des raccourcis légers : `make trigger` (déclencher le pipeline), `make last-run`, `make logs`, `make fresh` (`make help` pour la liste). Ce runbook conserve les **variantes diagnostic** — plus riches (filtrage `jq`, asymétrie raw/marts, chemins Knative v1) — destinées à l'investigation d'un incident, pas au coup d'œil. Voir D114.
+
 ---
 
 ## 1. Surveillance hebdomadaire (mitigation D109)
