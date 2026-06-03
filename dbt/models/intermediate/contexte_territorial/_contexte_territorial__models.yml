@@ -19,26 +19,32 @@ models:
         description: >
           Code INSEE commune, post-normalisation PLM. Paris → 75056, Lyon →
           69123, Marseille → 13055.
-        tests:
+        data_tests:
           - not_null
 
       - name: annee
         description: Année de référence des effectifs URSSAF.
-        tests:
+        data_tests:
           - not_null
 
       - name: nb_etablissements_it
         description: >
           Nombre d'établissements du secteur IT (APE 62xx) dans la commune pour
-          l'année donnée.
-        tests:
+          l'année donnée. Un 0 est ambigu : il peut signifier soit une absence
+          réelle d'établissements IT dans la commune, soit une donnée manquante
+          en amont — le staging applique COALESCE(.., 0) (D39), qui écrase la
+          distinction NULL vs 0 réel. À nuancer si exposé tel quel au dashboard.
+        data_tests:
           - not_null
 
       - name: effectifs_salaries_it
         description: >
           Nombre de salariés du secteur IT (APE 62xx) dans la commune pour
-          l'année donnée.
-        tests:
+          l'année donnée. Un 0 est ambigu : il peut signifier soit une absence
+          réelle de salariés IT dans la commune, soit une donnée manquante en
+          amont — le staging applique COALESCE(.., 0) (D39), qui écrase la
+          distinction NULL vs 0 réel. À nuancer si exposé tel quel au dashboard.
+        data_tests:
           - not_null
 
   - name: int_tensions_bassin_emploi
