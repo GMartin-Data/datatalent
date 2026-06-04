@@ -72,9 +72,9 @@ territoriaux pour servir Looker Studio en table large.
 ```mermaid
 flowchart LR
     subgraph staging["Staging — nettoyage mono-source"]
-        STG_FT["stg_france_travail__offres<br/>categorie_metier · salaire parsé<br/>source = 'france_travail'"]
+        STG_FT["stg_france_travail__offres<br/>categorie_metier ·<br/>salaire parsé<br/>source = 'france_travail'"]
         STG_ADZ["stg_adzuna__offres<br/>salaire annualisé<br/>source = 'adzuna'"]
-        STG_SI["stg_sirene__etablissements<br/>filtre actifs · masquage RGPD"]
+        STG_SI["stg_sirene__etablissements<br/>filtre actifs · tags PII · non exposé"]
         STG_GEO["stg_geo__communes<br/>+ departements + regions"]
         STG_UE["stg_urssaf__effectifs<br/>_commune_ape"]
         STG_BMO["stg_bmo__projets<br/>_recrutement"]
@@ -83,13 +83,13 @@ flowchart LR
 
     subgraph intermediate["Intermediate — croisements + couche analytique"]
         INT_OFF["int_offres_enrichies<br/>UNION ALL FT + Adzuna<br/>+ enrichissement géo"]
-        INT_ANA["int_offres_analytiques<br/>multi-vues salaire · regroupement codeNAF<br/>flags qualité · dimensions temporelles"]
+        INT_ANA["int_offres_analytiques<br/>multi-vues salaire ·<br/>regroupement codeNAF<br/>flags qualité ·<br/>dimensions temporelles"]
         INT_DENS["int_densite_sectorielle<br/>_commune"]
         INT_TENS["int_tensions_bassin<br/>_emploi"]
     end
 
     subgraph marts["Mart unifié — wide fact table grain offre"]
-        FCT_OFF["fct_offres<br/>métriques fenêtrées · audit · partitioning<br/>+ densité IT commune (LEFT JOIN)<br/>+ tensions BMO départementales (LEFT JOIN)<br/>+ benchmark salaire IT national (CROSS JOIN)<br/>+ statut_donnee fiabilité"]
+        FCT_OFF["fct_offres<br/>métriques fenêtrées · audit · partitioning<br/>+ densité IT commune (LEFT JOIN)<br/>+ tensions BMO départementales<br/>(LEFT JOIN)<br/>+ benchmark salaire IT national<br/>(CROSS JOIN)<br/>+ statut_donnee fiabilité"]
     end
 
     STG_FT -->|"UNION ALL"| INT_OFF
@@ -225,7 +225,7 @@ flowchart LR
     AP1 --> MAIL
     AP2 --> MAIL
 
-    GAP["Trou assumé : échec scheduler non couvert<br/>(métrique native inexistante · D109) → reporté Niveau 2"]
+    GAP["Trou assumé : échec scheduler<br/>non couvert (métrique<br/>native inexistante · D109)<br/>→ reporté Niveau 2"]
     CS -.->|"non couvert"| GAP
 
     linkStyle default stroke:#888,stroke-width:1.5px
