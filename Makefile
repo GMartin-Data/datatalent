@@ -29,10 +29,14 @@ last-run: ## Affiche la dernière exécution ingestion (statut SUCCEEDED attendu
 	  --job=$(JOB) --region=$(REGION) --project=$(PROJECT) --limit=1 \
 	  --format='table(name, status.completionTime, metadata.creationTimestamp)'
 
+# --freshness=7d : gcloud logging read ne lit que les dernières 24h par défaut.
+# Le run est hebdomadaire (cron lundi), donc 24h laisse la fenêtre vide hors du
+# lendemain d'un run. 7d couvre le dernier run hebdo quoi qu'il arrive.
 logs: ## Prouve l'enchaînement ingestion -> dbt (events structlog)
 	gcloud logging read \
 	  'resource.type=cloud_run_job AND jsonPayload.event=("ingestion_end" OR "dbt_invoked")' \
-	  --project=$(PROJECT) --limit=5 --format='value(timestamp, jsonPayload.event)'
+	  --project=$(PROJECT) --limit=5 --freshness=7d \
+	  --format='value(timestamp, jsonPayload.event)'
 
 fresh: ## Prouve la fraîcheur des marts (fct_offres reconstruit au dernier run)
 	bq query --use_legacy_sql=false --project_id=$(PROJECT) --format=prettyjson \
