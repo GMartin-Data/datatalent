@@ -17,7 +17,12 @@ models:
     columns:
       # Identifiants et noms d'entreprise marqués 'pii' : un établissement peut
       # être une entreprise individuelle (personne physique) — donnée personnelle
-      # au sens RGPD. Cf. is_diffusion_partielle ci-dessous.
+      # au sens RGPD. Le tag sert la traçabilité (inventaire des PII, requêtable
+      # via `tag:pii` dans le catalogue) ; aucun masquage n'est appliqué ici car
+      # ce modèle n'alimente aucun mart : la jointure FT × Sirene ayant été
+      # abandonnée (D14-bis, SIRET absent des offres), Sirene n'est pas exposé en
+      # sortie et la PII ne quitte pas le périmètre technique. Cf.
+      # is_diffusion_partielle ci-dessous (flag de traçabilité, non exploité).
       - name: siret
         description: Identifiant SIRET de l'établissement (14 chiffres). Clé naturelle.
         config:
@@ -94,8 +99,10 @@ models:
 
       - name: is_diffusion_partielle
         description: >
-          TRUE si l'établissement a demandé une diffusion partielle (RGPD).
-          Les colonnes d'adresse détaillée sont exclues du staging.
+          TRUE si l'établissement a un statut de diffusion partielle INSEE
+          (statutDiffusionEtablissement = 'P', protection RGPD des personnes
+          physiques). Flag capturé pour traçabilité ; non exploité en aval, car
+          ce modèle n'alimente aucun mart (cf. en-tête : Sirene non exposé).
         data_tests:
           - not_null
           - accepted_values:
