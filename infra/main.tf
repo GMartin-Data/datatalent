@@ -113,15 +113,25 @@ resource "google_artifact_registry_repository" "docker" {
 
   # Purge automatique des anciennes images Docker pour rester sous le free tier
   # Artifact Registry (0,5 Go). Seules les 3 dernières versions de chaque image
-  # sont conservées. Voir D115.
+  # sont conservées. Voir D115 / D116.
   #
-  # dry_run = false : sans lui, la policy tourne en dry-run (elle logge ce qu'elle
-  # supprimerait sans rien supprimer) et l'accumulation continue (D115 : 49 versions /
-  # 8,9 Go observés). NB : sur un repo EXISTANT dont le state porte déjà `false`, cette
-  # ligne est un no-op au `plan` (HCL=state, jamais propagé à l'API) — le dry-run a été
-  # désarmé hors Terraform via `gcloud ... set-cleanup-policies --no-dry-run` (cf. D115).
-  # Cette ligne garantit le bon comportement à la (re)création du repo sur état neuf.
+  # Mécanique en DEUX policies (D116) : une policy KEEP seule ne supprime JAMAIS rien
+  # (doc Google : « Keep policies work with delete policies »). Il faut une policy
+  # DELETE qui désigne les candidats à la suppression (ici tagState=ANY = toutes les
+  # versions), la policy KEEP `most_recent_versions` protégeant les 3 plus récentes.
+  # Quand une version matche les deux, la KEEP gagne. Sans le bloc DELETE, la policy
+  # initiale (KEEP seule, D115) était inerte — 22/28 versions accumulées malgré deux
+  # armements `--no-dry-run`, qui n'avaient rien à armer.
   cleanup_policy_dry_run = false
+
+  cleanup_policies {
+    id     = "delete-all-but-recent"
+    action = "DELETE"
+
+    condition {
+      tag_state = "ANY"
+    }
+  }
 
   cleanup_policies {
     id     = "keep-recent"
