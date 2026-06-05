@@ -161,6 +161,16 @@ charge par les workflows CD au merge sur `main`.
 
 ---
 
+## Liens utiles
+
+| Ressource | Lien |
+|---|---|
+| Dashboard analytique (Looker Studio) | [ouvrir](https://datastudio.google.com/reporting/8d729c5a-d3aa-47e2-aaed-da3ccf3011d2/page/QVjzF) |
+| Dashboard coûts | [ouvrir](https://datastudio.google.com/reporting/1da67a3c-ebb6-404e-afdc-e36ad17a31d0/page/4lzuF) |
+| Suivi projet (Trello) | [ouvrir](https://trello.com/b/45dfMWTF/team-glaq) |
+
+---
+
 ## Documentation
 
 | Document | Contenu |
