@@ -35,7 +35,7 @@ last-run: ## Affiche la dernière exécution ingestion (succeededCount=1 attendu
 logs: ## Prouve l'enchaînement ingestion -> dbt (events structlog)
 	gcloud logging read \
 	  'resource.type=cloud_run_job AND jsonPayload.event=("ingestion_end" OR "dbt_invoked")' \
-	  --project=$(PROJECT) --limit=5 --freshness=7d \
+	  --project=$(PROJECT) --limit=10 --freshness=7d \
 	  --format='value(timestamp, jsonPayload.event)'
 
 fresh: ## Prouve la fraîcheur des marts (fct_offres reconstruit au dernier run)
