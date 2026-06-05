@@ -24,10 +24,10 @@ trigger: ## Déclenche le pipeline via le Scheduler (chaîne exacte du cron, fir
 	gcloud scheduler jobs run $(SCHEDULER) \
 	  --location=$(REGION) --project=$(PROJECT)
 
-last-run: ## Affiche la dernière exécution ingestion (statut SUCCEEDED attendu)
+last-run: ## Affiche la dernière exécution ingestion (succeededCount=1 attendu)
 	gcloud run jobs executions list \
 	  --job=$(JOB) --region=$(REGION) --project=$(PROJECT) --limit=1 \
-	  --format='table(name, status.completionTime, metadata.creationTimestamp)'
+	  --format='table(name, status.succeededCount, status.completionTime, metadata.creationTimestamp)'
 
 # --freshness=7d : gcloud logging read ne lit que les dernières 24h par défaut.
 # Le run est hebdomadaire (cron lundi), donc 24h laisse la fenêtre vide hors du
