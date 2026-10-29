@@ -249,4 +249,4 @@ API plus moderne, chemins plats.
 - **D109** dans `notes-projet.md` — justification de la mitigation humaine et report Niveau 2.
 - **D110** dans `notes-projet.md` — décomposition du délai de notification.
 - **D113** dans `notes-projet.md` — incident type ayant donné naissance à ce runbook.
-- **TODO-4 / TODO-5 / TODO-8** dans `~/explain/rétro-todo.md` — extensions futures (alerte scheduler Niveau 2, durcissement garde env var).
+- **TODO-4 / TODO-5 / TODO-8** dans `~/explain/archive/datatalent/rétro-todo.md` — extensions futures (alerte scheduler Niveau 2, durcissement garde env var).
